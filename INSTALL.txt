@@ -1,0 +1,31 @@
+Steps to build and install are currently the same.  If you're used to C/C++ development on *nix and have shell experience, use the quick directions.  If not, use the detailed ones that follow.
+
+Quick:
+ - Make sure your environment is sane. (Read: POSIX compliant.)
+ - Make sure you have the GCC installed.
+ - Install libSDL 1.2.x.
+ - Install premake4.
+ - From this directory, `cd ./source`
+ - Run premake4 in a way similar to `premake4 --cc=gcc --file=premake4.lua --os=macosx gmake`
+ - Build by doing `make`.
+
+ - Optionally make a shell script in the source dir that has your premake4 command automated in a file called 'pm.sh', as this is already added to the .gitignore
+
+Detailed:
+
+Before attempting to install be sure you are operating in an environment that attempts POSIX compliance.  This means that you can use GCC to emit a binary and run it.
+
+Following this, install SDL 1.2.X, which can be obtained for most any platform here: http://www.libsdl.org/download-1.2.php
+
+With this completed be sure that SDL_main.h is somewhere where GCC will be able to find it.  After you are sure of this install the most recent version of the tool premake for your platform.  It can be found here: http://industriousone.com/premake/download
+
+Be sure that you premake4 has been properly installed and added to your PATH by ensuring that `premake4 --version` produces a favorable result.
+
+Now that our environment is ready, change to the 'source' directory, which should already exist in the same directory as this text file.  Execute `premake4 --cc=gcc --file=premake4.lua --os=<YOUR_OS> gmake`, where YOUR_OS is whatever value suits your environment.  Ideally bsd, linux, or macosx.  More information on acceptable parameters to premake can be obtained easily by executing `premake4 --help`.
+
+You should now be able to simply type `make` and all should be right with the world.  Please note that although inconvenient, if new source files are created the previously executed premake command must be executed again from the 'source' directory.  If you find yourself doing this a lot, see the section of this document entitled 'Simple Scripting of Premake4'.
+
+If all is not right with the world, please contact someone in the CREDITS.txt file.
+
+Simple Scripting of Premake4:
+Create a file in the 'source' directory called 'pm.sh'.  The filename is important because it has already been added to the .gitignore file so it will not be accidentally committed to the repository.  This would be bad because it contains system specific configuration settings that may muck up someone else's build.  The first line of the pm.sh file should be '#!/bin/bash'.  The second line should be your premake4 incantation.  Mine is `premake4 --cc=gcc --file=premake4.lua --os=macosx --platform=universal64 gmake`.  Save the file and run `chmod +x pm.sh` in the terminal.  Now, instead of typing all that stuff you can just run `./pm.sh && make`.
