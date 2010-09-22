@@ -1,0 +1,4 @@
+Main developers are:
+John Rafferty
+Yi Ding
+Chris Galardi
