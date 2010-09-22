@@ -1,0 +1,9 @@
+*.swp
+.DS_Store
+Makefile
+obj/
+*.make
+pm.sh
+
+vm
+test
