@@ -11,16 +11,47 @@ extern "C"
 int main(int argc, char *argv[])
 {
     char c;
+    char *outpath = NULL;
+    char *inpath = NULL;
+    size_t mem_size = 256;
     
     // Handle command line options
-    while ((c = getopt(argc, argv, "v")) != -1)
+    while ((c = getopt(argc, argv, "vo:i:m:h")) != -1)
     {
         switch (c)
         {
             case 'v':
+            printf("YAAA VM Version d0.0.1\n");
+            exit(0);
             
+            case 'o':
+            outpath = (char *)malloc(sizeof(char)* strlen(optarg) + 1);
+            strcpy(outpath, optarg);
             break;
-            default:
+            
+            case 'i':
+            inpath = (char *)malloc(sizeof(char)* strlen(optarg) + 1);
+            strcpy(inpath, optarg);
+            break;
+            
+            case 'm':
+            mem_size = atoi(optarg);
+            if (mem_size == 0)
+            {
+                printf("Memory size argument evaluated to zero.  Using 256kb.\n");
+                mem_size = 256;
+            }
+            break;
+            
+            case 'h':
+            printf("YAAA VM Help:\n");
+            printf("v\t\t\tPrint version string.\n");
+            printf("o [path]\t\tPrint memory to file.\n");
+            printf("i [path]\t\tRead memory in from file.\n");
+            printf("m [Uint32]\t\tMachine memory size in kilobytes.\n");
+            exit(0);
+            
+            default:            
             break;
         }
     }
