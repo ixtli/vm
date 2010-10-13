@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "includes/virtualmachine.h"
 
 VirtualMachine *vm = NULL;
@@ -41,6 +43,9 @@ bool VirtualMachine::init(  const char *mem_in, const char *mem_out,
     if (mmu->init())
         return (true);
     
+    //mmu->read(0, read);
+    //mmu->readRange(0,4,false,&test);
+    
     // No errors
     return (false);
 }
@@ -56,9 +61,69 @@ void VirtualMachine::run()
         if (terminate)
             return;
         // If we get here, we have a job to do.
-        
-        // Got some data from a client
-        printf("Client said %s", operation);
+        char *pch;
+        pch = strtok(operation, " ");
+        if (pch != NULL) {
+        if (strcmp(pch, kWriteCommand) == 0)
+        {
+            int addr, val;
+            pch = strtok(NULL, " ");
+            if (pch)
+                addr = atoi(pch);
+            else
+                addr = 0;
+            
+            pch = strtok(NULL, " ");
+            if (pch)
+                val = atoi(pch);
+            else
+                val = 0;
+            
+            mmu->write(addr, val);
+            
+            response = (char *)malloc(sizeof(char) * 512);
+            sprintf(response, "Value '%i' has been placed at location '%#x'.\n",
+                val, addr);
+            respsize = strlen(response);
+        } else if (strcmp(pch, kReadCommand) == 0) {
+            // read
+            int addr;
+            unsigned int val;
+            pch = strtok(NULL, " ");
+            if (pch)
+                addr = atoi(pch);
+            else
+                addr = 0;
+            
+            mmu->read(addr, val);
+            
+            response = (char *)malloc(sizeof(char) * 512);
+            sprintf(response, "%#x - %i\n", addr, val);
+            respsize = strlen(response);
+        } else if (strcmp(pch, kRangeCommand) == 0) {
+            // range
+            int addr, val;
+            pch = strtok(NULL, " ");
+            if (pch)
+                addr = atoi(pch);
+            else
+                addr = 0;
+            
+            pch = strtok(NULL, " ");
+            if (pch)
+                val = atoi(pch);
+            else
+                val = 0;
+            
+            char *temp;
+            mmu->readRange(addr, val, true, &temp);
+            response = temp;
+            respsize = strlen(response);
+        } else {
+            // unknown command
+            respsize = 0;
+        }
+        }
         
         // we're done
         pthread_mutex_unlock(&waiting);

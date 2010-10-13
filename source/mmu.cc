@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "includes/mmu.h"
 
 MMU::MMU(size_t size, size_t rtime, size_t wtime) : 
@@ -33,38 +35,53 @@ bool MMU::init()
     return (false);
 }
 
-size_t MMU::write(size_t addr, size_t valueToSave)
+size_t MMU::write(size_t addr, unsigned int valueToSave)
 {
+    if (addr >= _memory_size)
+        return 0;
+    
     _memory[addr] = valueToSave;
-    printf("%li", valueToSave, " has been placed at %li", addr, " %li", _memory[addr]);   
 
     return (_write_time);
 }
 
-size_t MMU::read(size_t addr, size_t &valueToRet)
+size_t MMU::read(size_t addr, unsigned int &valueToRet)
 {
+    if (addr >= _memory_size)
+        return 0;
+    
     valueToRet = _memory[addr];
-    printf("the address %li", addr, " contains %li", valueToRet);
 
     return (_read_time);
 }
 
-char* MMU::readRange(size_t start, size_t end, bool hex)
+size_t MMU::readRange(size_t start, size_t end, bool hex, char **ret)
 { 
-    int size = int(end - start);
+    // Whats the max value?
+    int length = 25;
+        
+    size_t words = end - start;
+    size_t max_size = words + (words*length) + 1;
    
     //char range[size];
-    char* range = (char*)malloc(sizeof(char) * size);
-    char single[1];    
+    *ret = (char*)malloc(sizeof(char) * max_size);
+    char *val = *ret;
+    
+    char single[length+2];
+    size_t range_index = 0;
 
     for(int i = 0; start+i <= end; i++)
     {
         if (!hex)
-            sprintf(single, "%d",  _memory[start+i]);
+            sprintf(single, "%#x\t- %d\n",  (unsigned int)start+i, _memory[start+i]);
         else
-            sprintf(single, "%x",  _memory[start+i]);
-
-        range[i] = single[0];
+            sprintf(single, "%#x\t- %#x\n",  (unsigned int)start+i, _memory[start+i]);
+        
+        strncpy(&val[range_index], single, strlen(single));
+        
+        range_index += strlen(single);
     }
-    return (range);
+    val[range_index] = '\0';
+    
+    return (_read_time * words);
 }

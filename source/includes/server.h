@@ -22,6 +22,8 @@
 #define kServerHangingUp        "300"
 #define kWaitingForRequests     "400"
 
+#define kUnknownCommandMSG      "Unknown command."
+
 class MonitorServer
 {
 public:

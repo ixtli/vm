@@ -204,6 +204,16 @@ void *serve( void *ptr )
                         // try to get it back by waiting again
                         // (enter the queue)
                         pthread_mutex_lock(&vm->waiting);
+                        if (vm->respsize > 0)
+                        {
+                            send(i, vm->response, vm->respsize, 0);
+                            free(vm->response);
+                        } else {
+                            // unknown command
+                            char temp[512];
+                            sprintf(temp, "Unknown command: %s", buf);
+                            send(i, temp, strlen(temp), 0);
+                        }
                     }
                 }
             }

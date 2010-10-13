@@ -5,6 +5,10 @@
 #include "server.h"
 #include "mmu.h"
 
+#define kWriteCommand   "WRITE"
+#define kReadCommand    "READ"
+#define kRangeCommand   "RANGE"
+
 enum VMComponantTimings {
     kMMUReadClocks = 100,
     kMMUWriteClocks = 100
@@ -27,8 +31,8 @@ public:
     
     pthread_mutex_t waiting;
     // The following are READ/WRITE LOCKED by 'waiting'
-    char *operation;
-    size_t opsize;
+    char *operation, *response;
+    size_t opsize, respsize;
 private:
     MMU *mmu;
     MonitorServer *ms;
