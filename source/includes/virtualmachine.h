@@ -36,6 +36,7 @@ public:
 private:
     MMU *mmu;
     MonitorServer *ms;
+    const char *dump_path;
 };
 
 // Main VM context

@@ -7,3 +7,6 @@ pm.sh
 
 vm
 test
+out
+in
+*.txt

@@ -1,4 +1,6 @@
 #include <string.h>
+#include <fstream>
+#include <iostream>
 
 #include "includes/mmu.h"
 
@@ -32,6 +34,46 @@ bool MMU::init()
    
     size_t memBuff;
  
+    return (false);
+}
+
+bool MMU::loadFile(const char *path)
+{
+    char buffer[256];
+    std::ifstream myfile(path);
+    
+    int i = 0;
+    
+    printf("Loading memory image '%s'... ", path);
+    
+    while (myfile.good() && i+1 < _memory_size )
+    {
+        myfile.getline(buffer, 255);
+        _memory[++i] = atoi(buffer);
+    }
+    
+    myfile.close();
+    printf("Done.\n");
+    
+    return (false);
+}
+
+bool MMU::writeOut(const char *path)
+{
+    std::ofstream myfile(path, std::ifstream::out);
+    
+    if (!myfile.is_open())
+        return (true);
+    
+    printf("Dumping memory image '%s'... ", path);
+    for (int i = 0; i < _memory_size; i++)
+    {
+        myfile << _memory[i] << std::endl;
+    }
+    
+    myfile.close();
+    printf("Done.\n");
+    
     return (false);
 }
 

@@ -97,5 +97,9 @@ int main(int argc, char *argv[])
     // Clean up and exit
     delete vm;
     //WindowManager::Destroy();
+    if (inpath)
+        free(inpath);
+    if (outpath)
+        free(outpath);
     return 0;
 }
