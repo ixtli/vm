@@ -64,7 +64,7 @@ int main(int argc, char *argv[])
     wm->Init(640, 480);
     
     // Now that we've intialized our environment, start the machine
-    VirtualMachine *vm = new VirtualMachine();
+    vm = new VirtualMachine();
     
     // Init the VM
     if (vm->init(inpath, outpath, mem_size))

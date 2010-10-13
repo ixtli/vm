@@ -4,6 +4,7 @@
 // Keep this file SPARSE!
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
 
 // Keep this list even sparser :P
 #define DISALLOW_COPY_AND_ASSIGN(TypeName)\
