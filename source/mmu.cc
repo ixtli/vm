@@ -51,24 +51,26 @@ size_t MMU::read(size_t addr, size_t &valueToRet)
 
 char* MMU::readRange(size_t start, size_t end, size_t type)
 { 
-    size_t size = end - start;
+    int size = int(end - start);
    
-    char range[size];
+    char* range[size];
 
     for(int i = 0; start+i <= end; i++)
     {
 	switch (type)
         {
 	case 1:
+		sprintf(range[i], "%d",  _memory[start+i]);
 		break;
-	case 2:
+	case 2:                
+		sprintf(range[i], "%x",  _memory[start+i]);
 		break;
-	case 3:
+	case 3:                
+		sprintf(range[i], "%d",  _memory[start+i]);
 		break;
 	default:
 		break;
-        range[i] = _memory[start+i];
    	}
     }	
-    return (range);
+    return (&range);
 }
