@@ -13,7 +13,7 @@ public:
     
     // Operational: must return the timing
     size_t write(size_t addr, size_t valueToSave);
-    size_t read(size_t addr);
+    size_t read(size_t addr, size_t &valueToRet);
 
 private:
     size_t _memory_size, _read_time, _write_time;

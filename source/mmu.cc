@@ -27,19 +27,24 @@ bool MMU::init()
     } else {
         printf("Done.\n");
     }
-    
+   
+    size_t memBuff;   
+ 
     return (false);
 }
 
 size_t MMU::write(size_t addr, size_t valueToSave)
 {
     _memory[addr] = valueToSave;
-    printf("%li ", valueToSave, " has been placed at %li ", addr, " %li ", _memory[addr]);   
+    printf("%li", valueToSave, " has been placed at %li", addr, " %li", _memory[addr]);   
+
     return _write_time;
 }
 
-size_t MMU::read(size_t addr)
+size_t MMU::read(size_t addr, size_t &valueToRet)
 {
-    
+    valueToRet = _memory[addr];
+    printf("the address %li", addr, " contains %li", valueToRet);
+
     return _read_time;
 }
