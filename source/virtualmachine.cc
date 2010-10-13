@@ -7,15 +7,19 @@ VirtualMachine::VirtualMachine()
 
 VirtualMachine::~VirtualMachine()
 {
-    
+    printf("Destroying virtual machine...\n");
+    delete mmu;
 }
 
 bool VirtualMachine::init(  const char *mem_in, const char *mem_out,
                             size_t mem_size)
 {
     printf("Initizing virtual machine...\n");
-    mmu = new MMU(mem_size);
-    mmu->init();
+    
+    // Init memory
+    mmu = new MMU(mem_size, kMMUReadClocks, kMMUWriteClocks);
+    if (mmu->init())
+        return (true);
     
     // No errors
     return (false);
@@ -23,6 +27,6 @@ bool VirtualMachine::init(  const char *mem_in, const char *mem_out,
 
 void VirtualMachine::run()
 {
-    delete mmu;
+    printf("Running...\n");
 }
 

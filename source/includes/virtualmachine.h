@@ -4,6 +4,11 @@
 #include "global.h"
 #include "mmu.h"
 
+enum VMComponantTimings {
+    kMMUReadClocks = 100,
+    kMMUWriteClocks = 100
+};
+
 class VirtualMachine
 {
 public:
