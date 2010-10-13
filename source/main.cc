@@ -1,4 +1,4 @@
-#include <unistd.h>
+#include <signal.h>
 
 #include "includes/windowmanager.h"
 #include "includes/virtualmachine.h"
@@ -11,12 +11,30 @@
 extern "C"
 #endif
 
+void sigint_handler(int sig)
+{
+    printf("Caught signal.  Killing.\n");
+    vm->terminate = true;
+}
+
 int main(int argc, char *argv[])
 {
     char c;
     char *outpath = NULL;
     char *inpath = NULL;
     size_t mem_size = 256;
+    
+    // Register signal
+    void sigint_handler(int sig);
+    struct sigaction sa;
+    sa.sa_handler = sigint_handler;
+    sa.sa_flags = SA_RESTART;
+    sigemptyset(&sa.sa_mask);
+    
+    if (sigaction(SIGINT, &sa, NULL) == -1)
+    {
+        exit(1);
+    }
     
     // Handle command line options
     while ((c = getopt(argc, argv, "vo:i:m:h")) != -1)

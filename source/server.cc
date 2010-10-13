@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
@@ -39,11 +40,6 @@ int MonitorServer::run()
     // spawn a listener thread
     int ret = pthread_create( &_listener, NULL, listen_for_connections, NULL);
     return (ret);
-}
-
-void sigchld_handler(int s)
-{
-    while(waitpid(-1, NULL, WNOHANG) > 0);
 }
 
 // get sockaddr, IPv4 or IPv6:
@@ -91,15 +87,33 @@ void *handle_connection( void *ptr )
 void *listen_for_connections( void *ptr )
 {
     printf("Monitor connection listener thread started.\n");
-    int sockfd, new_fd;
-    struct addrinfo hints, *serverinfo, *p;
-    // client info
-    struct sockaddr_storage their_addr;
-    socklen_t sin_size;
-    struct sigaction sa;
-    int yes = 1;
-    char s[INET6_ADDRSTRLEN];
+    
+    fd_set master;      // Master fd descr list
+    fd_set read_fds;    // temp fd for select()
+    int fdmax;          // max file desc number
+    
+    int listener;
+    int newfd;
+    struct sockaddr_storage remoteaddr;
+    socklen_t addrlen;
+    
+    char buf[256];
+    int nbytes;
+    
+    char remoteIP[INET6_ADDRSTRLEN];
+    
+    int yes=1;
     int rv;
+    
+    struct addrinfo hints, *serverinfo, *p;
+    
+    // timing for the select
+    struct timeval tv;
+    tv.tv_usec = 500000; // every .5 seconds check for termination call
+    
+    // Clear the master and temp sets
+    FD_ZERO(&master);
+    FD_ZERO(&read_fds);
     
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_UNSPEC;
@@ -115,24 +129,18 @@ void *listen_for_connections( void *ptr )
     // loop through all resuls and bind to the first one
     for (p = serverinfo; p != NULL; p = p->ai_next)
     {
-        if ((sockfd = socket(p->ai_family, p->ai_socktype,
-                            p->ai_protocol)) == -1)
+        listener = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+        if (listener < 0)
         {
-            perror("server: socket");
             continue;
         }
         
-        if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
-                        sizeof(int)) == -1)
-        {
-            perror("setsockopt");
-            exit(1);
-        }
+        // get rid of "address already in use" messages
+        setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
         
-        if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1)
+        if (bind(listener, p->ai_addr, p->ai_addrlen) < 0)
         {
-            close(sockfd);
-            perror("server: bind");
+            close(listener);
             continue;
         }
         
@@ -148,55 +156,84 @@ void *listen_for_connections( void *ptr )
     // clean up server info
     freeaddrinfo(serverinfo);
     
-    if (listen(sockfd, BACKLOG) == -1)
+    if (listen(listener, BACKLOG) == -1)
     {
         perror("listen");
-        exit(1);
-    }
-    
-    // reap dead processes
-    sa.sa_handler = sigchld_handler;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART;
-    if (sigaction(SIGCHLD, &sa, NULL) == -1)
-    {
-        perror("sigaction");
         exit(1);
     }
     
     printf("Listening for server conncetions...\n");
     fflush(stdout);
     
+    // add listener to master set
+    FD_SET(listener, &master);
+    
+    // keep track of the biggest file desriptor
+    fdmax = listener;
+    
     while(!vm->terminate)
     {
-        sin_size = sizeof(their_addr);
-        new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
-        if (new_fd == -1)
+        // copy master fds
+        read_fds = master;
+        if (select(fdmax+1, &read_fds, NULL, NULL, &tv) == -1)
         {
-            perror("accept");
-            continue;
+            perror("select");
+            return (NULL);
         }
         
-        inet_ntop(their_addr.ss_family,
-            get_in_addr((struct sockaddr *)&their_addr),
-            s, sizeof(s));
-        printf("Got a connection from %s\n", s);
-        
-        // Check to make sure we wouldn't be going over our max connections
-        if (_connection_count >= MAX_CONNECTIONS)
+        // poll existing connections looking for data to read
+        for (int i = 0; i <= fdmax; i++)
         {
-            if (send(new_fd, kTooManyConnections, kCodeLength, 0) == -1)
-                perror("Sending to denied client.");
-            close(new_fd);
-        } else {
-            // start a new process
-            printf("Accepting connection.\n");
-            pthread_t new_thread;
-            int ret = pthread_create(
-                &new_thread, NULL, handle_connection, (void *)new_fd);
+            if (FD_ISSET(i, &read_fds))
+            {
+                // Someone wants to talk to us
+                if (i == listener)
+                {
+                    // This is a new connection ...
+                    addrlen = sizeof(remoteaddr);
+                    newfd = accept(listener, (struct sockaddr *)&remoteaddr,
+                        &addrlen);
+                    
+                    if (newfd == -1)
+                    {
+                        perror("accept");
+                    } else {
+                        // add to master set
+                        FD_SET(newfd, &master);
+                        if (newfd > fdmax)
+                        {
+                            // keep track of max fd
+                            fdmax = newfd;
+                        }
+                        printf("New connection from %s on socket %d\n",
+                            inet_ntop(remoteaddr.ss_family,
+                            get_in_addr((struct sockaddr *)&remoteaddr),
+                            remoteIP, INET6_ADDRSTRLEN),
+                            newfd);
+                    }
+                } else {
+                    // handle data from client
+                    if ((nbytes = recv(i, buf, sizeof(buf), 0)) <= 0)
+                    {
+                        //got error or connection closed by client
+                        if (nbytes == 0)
+                        {
+                            // connection closed
+                            printf("Socket %d hung up.\n", i);
+                        } else {
+                            perror("recv");
+                        }
+                        close(i);
+                        // Remove from master set
+                        FD_CLR(i, &master);
+                    } else {
+                        // Got some data from a client
+                        buf[sizeof(buf)-1] = '\0';
+                        printf("Client said %s", buf);
+                    }
+                }
+            }
         }
     }
-    
-    printf("Waiting for child processes to close...");
 }
 

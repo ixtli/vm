@@ -9,6 +9,9 @@ VirtualMachine::VirtualMachine()
 
 VirtualMachine::~VirtualMachine()
 {
+    // Do this first, just in case
+    delete ms;
+    
     printf("Destroying virtual machine...\n");
     delete mmu;
 }
@@ -39,5 +42,10 @@ bool VirtualMachine::init(  const char *mem_in, const char *mem_out,
 void VirtualMachine::run()
 {
     printf("Running...\n");
+    
+    while (!terminate)
+    {
+        // Wait for something to happen
+    }
 }
 

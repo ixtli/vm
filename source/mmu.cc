@@ -28,7 +28,7 @@ bool MMU::init()
         printf("Done.\n");
     }
    
-    size_t memBuff;   
+    size_t memBuff;
  
     return (false);
 }
