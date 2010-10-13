@@ -38,7 +38,7 @@ size_t MMU::write(size_t addr, size_t valueToSave)
     _memory[addr] = valueToSave;
     printf("%li", valueToSave, " has been placed at %li", addr, " %li", _memory[addr]);   
 
-    return _write_time;
+    return (_write_time);
 }
 
 size_t MMU::read(size_t addr, size_t &valueToRet)
@@ -46,10 +46,10 @@ size_t MMU::read(size_t addr, size_t &valueToRet)
     valueToRet = _memory[addr];
     printf("the address %li", addr, " contains %li", valueToRet);
 
-    return _read_time;
+    return (_read_time);
 }
 
-char* MMU::readRange(size_t start, size_t end)
+char* MMU::readRange(size_t start, size_t end, size_t type)
 { 
     size_t size = end - start;
    
@@ -57,7 +57,18 @@ char* MMU::readRange(size_t start, size_t end)
 
     for(int i = 0; start+i <= end; i++)
     {
+	switch (type)
+        {
+	case 1:
+		break;
+	case 2:
+		break;
+	case 3:
+		break;
+	default:
+		break;
         range[i] = _memory[start+i];
+   	}
     }	
-    return range;
+    return (&range);
 }

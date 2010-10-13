@@ -21,6 +21,10 @@ public:
 
     bool init(const char *mem_in, const char *mem_out, size_t mem_size);
     void run();
+    
+    // The following is a hack!
+    bool terminate;
+    
 private:
     MMU *mmu;
     MonitorServer *ms;
