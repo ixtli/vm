@@ -53,24 +53,24 @@ char* MMU::readRange(size_t start, size_t end, size_t type)
 { 
     int size = int(end - start);
    
-    char* range[size];
+    //char range[size];
+    char* range = (char*)malloc(sizeof(char) * size);
+    char single[1];    
 
     for(int i = 0; start+i <= end; i++)
     {
 	switch (type)
         {
 	case 1:
-		sprintf(range[i], "%d",  _memory[start+i]);
+		sprintf(single, "%d",  _memory[start+i]);
 		break;
 	case 2:                
-		sprintf(range[i], "%x",  _memory[start+i]);
-		break;
-	case 3:                
-		sprintf(range[i], "%d",  _memory[start+i]);
+		sprintf(single, "%x",  _memory[start+i]);
 		break;
 	default:
 		break;
    	}
+	range[i] = single[0];
     }	
-    return (&range);
+    return (range);
 }
