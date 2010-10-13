@@ -48,3 +48,16 @@ size_t MMU::read(size_t addr, size_t &valueToRet)
 
     return _read_time;
 }
+
+char* MMU::readRange(size_t start, size_t end)
+{ 
+    size_t size = end - start;
+   
+    char range[size];
+
+    for(int i = 0; start+i <= end; i++)
+    {
+        range[i] = _memory[start+i];
+    }	
+    return range;
+}
