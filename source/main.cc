@@ -1,5 +1,8 @@
 #include <unistd.h>
+
 #include "includes/windowmanager.h"
+#include "includes/virtualmachine.h"
+
 #include "SDL_main.h"
 
 // The SDL_main.h installed for OS X says that the following
@@ -51,7 +54,7 @@ int main(int argc, char *argv[])
             printf("m [Uint32]\t\tMachine memory size in kilobytes.\n");
             exit(0);
             
-            default:            
+            default:
             break;
         }
     }
@@ -60,10 +63,21 @@ int main(int argc, char *argv[])
     WindowManager::Create();
     wm->Init(640, 480);
     
-    // Wait on some sort of user action
-    wm->PollEventQueue();
+    // Now that we've intialized our environment, start the machine
+    VirtualMachine *vm = new VirtualMachine();
+    
+    // Init the VM
+    if (vm->init(inpath, outpath, mem_size))
+    {
+        // We found a problem.
+        exit(1);
+    }
+    
+    // Run the VM
+    vm->run();
     
     // Clean up and exit
+    delete vm;
     WindowManager::Destroy();
     return 0;
 }
