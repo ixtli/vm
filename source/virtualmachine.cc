@@ -16,6 +16,8 @@ VirtualMachine::~VirtualMachine()
 bool VirtualMachine::init(  const char *mem_in, const char *mem_out,
                             size_t mem_size)
 {
+    terminate = false;
+    
     printf("Initializing server... \n");
     ms = new MonitorServer();
     if (ms->init())
