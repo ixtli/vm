@@ -14,6 +14,8 @@
 
 void *serve( void *ptr );
 
+pthread_t _listener;
+
 MonitorServer::MonitorServer()
 {}
 
