@@ -67,6 +67,9 @@ char* MMU::readRange(size_t start, size_t end, size_t type)
 	case 2:                
 		sprintf(single, "%x",  _memory[start+i]);
 		break;
+	case 3: //in case of emergency
+		printf(_memory[start+i]);
+		break;
 	default:
 		break;
    	}
