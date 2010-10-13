@@ -49,7 +49,7 @@ size_t MMU::read(size_t addr, size_t &valueToRet)
     return (_read_time);
 }
 
-char* MMU::readRange(size_t start, size_t end, size_t type)
+char* MMU::readRange(size_t start, size_t end, bool hex)
 { 
     int size = int(end - start);
    
@@ -59,21 +59,12 @@ char* MMU::readRange(size_t start, size_t end, size_t type)
 
     for(int i = 0; start+i <= end; i++)
     {
-	switch (type)
-        {
-	case 1:
-		sprintf(single, "%d",  _memory[start+i]);
-		break;
-	case 2:                
-		sprintf(single, "%x",  _memory[start+i]);
-		break;
-	case 3: //in case of emergency
-		printf(_memory[start+i]);
-		break;
-	default:
-		break;
-   	}
-	range[i] = single[0];
-    }	
+        if (!hex)
+            sprintf(single, "%d",  _memory[start+i]);
+        else
+            sprintf(single, "%x",  _memory[start+i]);
+
+        range[i] = single[0];
+    }
     return (range);
 }
