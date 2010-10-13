@@ -12,10 +12,7 @@
 
 #include "includes/server.h"
 
-void *listen_for_connections( void *ptr );
-
-pthread_t _listener;
-size_t _connection_count = 0;
+void *serve( void *ptr );
 
 MonitorServer::MonitorServer()
 {}
@@ -38,7 +35,7 @@ bool MonitorServer::init()
 int MonitorServer::run()
 {
     // spawn a listener thread
-    int ret = pthread_create( &_listener, NULL, listen_for_connections, NULL);
+    int ret = pthread_create( &_listener, NULL, serve, NULL);
     return (ret);
 }
 
@@ -52,39 +49,7 @@ void *get_in_addr(struct sockaddr *sa)
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
-void *handle_connection( void *ptr )
-{
-    long fd_temp = (long)ptr;
-    int fd = fd_temp; // We loose precision here but that's ok.
-    
-    if (send(fd, kConnectionAccepted, kCodeLength, 0) == -1)
-    {
-        perror("Sending to accepted client.");
-        close(fd);
-        _connection_count--;
-        return (NULL);
-    }
-    
-    while (!vm->terminate)
-    {
-        // Listen for a request
-        if (send(fd, kWaitingForRequests, kCodeLength, 0) == -1)
-        {
-            perror("Sending to accepted client.");
-            close(fd);
-            _connection_count--;
-            return (NULL);
-        }
-    }
-    
-    // clean up and disconnect
-    send(fd, kServerHangingUp, kCodeLength, 0);
-    close(fd);
-    _connection_count--;
-    return (NULL);
-}
-
-void *listen_for_connections( void *ptr )
+void *serve( void *ptr )
 {
     printf("Monitor connection listener thread started.\n");
     
