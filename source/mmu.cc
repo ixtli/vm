@@ -31,9 +31,10 @@ bool MMU::init()
     return (false);
 }
 
-size_t MMU::write(size_t addr)
+size_t MMU::write(size_t addr, size_t valueToSave)
 {
-    
+    _memory[addr] = valueToSave;
+    printf("%li ", valueToSave, " has been placed at %li ", addr, " %li ", _memory[addr]);   
     return _write_time;
 }
 

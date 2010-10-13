@@ -12,7 +12,7 @@ public:
     bool init();
     
     // Operational: must return the timing
-    size_t write(size_t addr);
+    size_t write(size_t addr, size_t valueToSave);
     size_t read(size_t addr);
 
 private:
