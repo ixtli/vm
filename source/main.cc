@@ -78,8 +78,8 @@ int main(int argc, char *argv[])
     }
     
     // Create the wm object and init it
-    WindowManager::Create();
-    wm->Init(640, 480);
+    //WindowManager::Create();
+    //wm->Init(640, 480);
     
     // Now that we've intialized our environment, start the machine
     vm = new VirtualMachine();
@@ -96,6 +96,6 @@ int main(int argc, char *argv[])
     
     // Clean up and exit
     delete vm;
-    WindowManager::Destroy();
+    //WindowManager::Destroy();
     return 0;
 }

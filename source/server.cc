@@ -1,5 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/time.h>
@@ -9,6 +7,7 @@
 #include <arpa/inet.h>
 #include <sys/wait.h>
 #include <signal.h>
+#include <pthread.h>
 
 #include "includes/server.h"
 
@@ -17,7 +16,7 @@ void *serve( void *ptr );
 pthread_t _listener;
 
 MonitorServer::MonitorServer()
-{}
+{ }
 
 MonitorServer::~MonitorServer()
 {
@@ -30,7 +29,6 @@ MonitorServer::~MonitorServer()
 
 bool MonitorServer::init()
 {
-    // No errors
     return (false);
 }
 
@@ -138,6 +136,10 @@ void *serve( void *ptr )
     // keep track of the biggest file desriptor
     fdmax = listener;
     
+    // Take the lock so the vm goes to sleep while we wait for
+    // something to do
+    pthread_mutex_lock(&vm->waiting);
+    
     while(!vm->terminate)
     {
         // copy master fds
@@ -194,13 +196,21 @@ void *serve( void *ptr )
                         // Remove from master set
                         FD_CLR(i, &master);
                     } else {
-                        // Got some data from a client
                         buf[sizeof(buf)-1] = '\0';
-                        printf("Client said %s", buf);
+                        vm->operation = buf;
+                        vm->opsize = sizeof(buf);
+                        // give the vm a chance to work
+                        pthread_mutex_unlock(&vm->waiting);
+                        // try to get it back by waiting again
+                        // (enter the queue)
+                        pthread_mutex_lock(&vm->waiting);
                     }
                 }
             }
         }
     }
+    
+    printf("Shutting down listener.\n");
+    pthread_mutex_unlock(&vm->waiting);
 }
 

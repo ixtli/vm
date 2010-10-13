@@ -19,14 +19,20 @@ VirtualMachine::~VirtualMachine()
 bool VirtualMachine::init(  const char *mem_in, const char *mem_out,
                             size_t mem_size)
 {
+    if (pthread_mutex_init(&waiting, NULL))
+    {
+        printf("Can't init mutex.\n");
+        return (true);
+    }
+    
     terminate = false;
     
     printf("Initializing server... \n");
     ms = new MonitorServer();
     if (ms->init())
-        return (false);
+        return (true);
     if (ms->run())
-        return (false);
+        return (true);
     
     printf("Initializing virtual machine...\n");
     
@@ -46,6 +52,16 @@ void VirtualMachine::run()
     while (!terminate)
     {
         // Wait for something to happen
+        pthread_mutex_lock(&waiting);
+        if (terminate)
+            return;
+        // If we get here, we have a job to do.
+        
+        // Got some data from a client
+        printf("Client said %s", operation);
+        
+        // we're done
+        pthread_mutex_unlock(&waiting);
     }
 }
 
