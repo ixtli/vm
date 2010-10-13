@@ -70,5 +70,5 @@ char* MMU::readRange(size_t start, size_t end, size_t type)
         range[i] = _memory[start+i];
    	}
     }	
-    return (&range);
+    return (range);
 }
