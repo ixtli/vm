@@ -42,7 +42,7 @@ int main(int argc, char *argv[])
             if (mem_size == 0)
             {
                 printf("Memory size argument evaluated to zero.  Using 256kb.\n");
-                mem_size = 256;
+                mem_size = 256000;
             }
             break;
             

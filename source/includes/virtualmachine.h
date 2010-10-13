@@ -12,6 +12,8 @@ public:
 
     bool init(const char *mem_in, const char *mem_out, size_t mem_size);
     void run();
+private:
+    MMU *mmu;
 };
 
 #endif
