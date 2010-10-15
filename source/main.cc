@@ -14,7 +14,7 @@ extern "C"
 void sigint_handler(int sig)
 {
     printf("Caught signal.  Killing.\n");
-    vm->terminate = true;
+    vm->terminate = 1;
 }
 
 int main(int argc, char *argv[])
@@ -76,7 +76,6 @@ int main(int argc, char *argv[])
             break;
         }
     }
-    
     // Create the wm object and init it
     //WindowManager::Create();
     //wm->Init(640, 480);

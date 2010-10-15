@@ -1,6 +1,8 @@
 #ifndef _VIRTUALMACHINE_H_
 #define _VIRTUALMACHINE_H_
 
+#include <signal.h>
+
 #include "global.h"
 #include "server.h"
 #include "mmu.h"
@@ -27,7 +29,7 @@ public:
     void run();
     
     // The following is a hack, I think!
-    bool terminate;
+    volatile sig_atomic_t terminate;
     
     pthread_mutex_t waiting;
     // The following are READ/WRITE LOCKED by 'waiting'
