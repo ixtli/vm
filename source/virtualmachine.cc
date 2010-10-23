@@ -2,7 +2,44 @@
 
 #include "includes/virtualmachine.h"
 
+// Macros for checking the PSR
+#define N_SET     (_psr & kPSRNBit)
+#define N_CLEAR  !(_psr & kPSRNBit)
+#define V_SET     (_psr & kPSRVBit)
+#define V_CLEAR  !(_psr & kPSRVBit)
+#define C_SET     (_psr & kPSRCBit)
+#define C_CLEAR  !(_psr & kPSRCBit)
+#define Z_SET     (_psr & kPSRZBit)
+#define Z_CLEAR  !(_psr & kPSRZBit)
+
 VirtualMachine *vm = NULL;
+
+inline unsigned int *VirtualMachine::selectRegister(char val)
+{
+    if (val < kPQ0Code)
+        // This is a general register
+        return (&_r[val]);
+    
+    if (val > kFPSRCode)
+        // This is an fpu register
+        return (&_fpr[val - kFPR0Code]);
+    
+    switch (val)
+    {
+        case kPSRCode:
+        return (&_psr);
+        case kPQ0Code:
+        return (&_pq[0]);
+        case kPQ1Code:
+        return (&_pq[1]);
+        case kPCCode:
+        return (&_pc);
+        case kFPSRCode:
+        return (&_fpsr);
+        default:
+        return (NULL);
+    }
+}
 
 bool VirtualMachine::evaluateConditional()
 {
@@ -16,22 +53,195 @@ bool VirtualMachine::evaluateConditional()
     
     // Test for two conditions that have nothing to do with the PSR
     // Always (most common case)
-    if (cond == 0xE)
+    if (cond == kCondAL)
         return (true);
     
     // Never ("no op")
-    if (cond == 0xF)
+    if (cond == kCondNV)
         return (false);
     
-    // Cond is now our index into the PSR.
-    unsigned int one = 1;
-    one = one << cond;
-    // If the bit at that index is flipped, execute the instruction
-    if (_psr && one)
-        return (true);
+    switch (cond)
+    {
+        case kCondEQ:           // Equal
+        if (Z_SET)                // Z bit set
+            return (true);
+        else
+            return (false);
+        
+        case kCondNE:           // Not equal
+        if (Z_CLEAR)              // Z bit clear
+            return (false);
+        else
+            return (true);
+
+        case kCondCS:           // unsigned higher or same
+        if (C_SET)
+            return (true);
+        else
+            return (false);
+
+        case kCondCC:           // Unsigned lower
+        if (C_CLEAR)
+            return (false);
+        else
+            return (true);
+
+        case kCondMI:           // Negative
+        if (N_SET)
+            return (true);
+        else
+            return (false);
+
+        case kCondPL:           // Positive or Zero
+        if (N_CLEAR)
+            return (false);
+        else
+            return (true);
+
+        case kCondVS:           // Overflow
+        if (V_SET)
+            return (true);
+        else
+            return (false);
+
+        case kCondVC:           // No Overflow
+        if (V_CLEAR)
+            return (true);
+        else
+            return (false);
+
+        case kCondHI:           // Unsigned Higher
+        if (C_SET && V_CLEAR)
+            return (true);
+        else
+            return (false);
+
+        case kCondLS:           // Unsigned lower or same
+        if (C_CLEAR || Z_SET)
+            return (true);
+        else
+            return (true);
+
+        case kCondGE:           // Greater or Equal
+        if ((N_SET && V_CLEAR) || (N_CLEAR && V_CLEAR))
+            return (true);
+        else
+            return (false);
+
+        case kCondLT:           // Less Than
+        if ((N_SET && V_CLEAR) || (N_CLEAR && V_SET))
+            return (true);
+        else
+            return (false);
+
+        case kCondGT:           // Greater Than
+        // Z clear, AND EITHER N set AND V set, OR N clear AND V clear
+        if (Z_CLEAR && (((N_SET && V_SET))||(N_CLEAR && V_CLEAR)))
+            return (true);
+        else
+            return (false);
+
+        case kCondLE:           // Less than or equal
+        // Z set, or N set and V clear, or N clear and V set
+        if (Z_CLEAR || (N_SET && V_CLEAR) || (N_CLEAR && V_SET))
+            return (true);
+        else
+            return (false);
+
+        default:
+        return (false);
+    }
+}
+
+size_t VirtualMachine::shiftOffset(unsigned int &offset)
+{
+    // Perform the somewhat complex operation of barrel shifting the offset
+    // return the cycles required to perform this operation
+}
+
+size_t VirtualMachine::dataProcessing(bool I, bool S, char op,
+    char s, char d, unsigned int &op2)
+{
+    size_t cycles = 0;
     
-    // Otherwise, don't do it
-    return (false);
+    if (!I)
+    {
+        // We need to shift the offset instead of treating it as an immediate
+        cycles += shiftOffset(op2);
+    }
+    
+    unsigned int *dest = selectRegister(d);
+    unsigned int *source = selectRegister(s);
+    
+    bool arithmetic = false;
+    
+    switch (op)
+    {
+        case kADD:
+        arithmetic = true;
+        *dest = *source + op2;
+        cycles += kADDCycles;
+        break;
+        
+        case kNOP:
+        default:
+        break;
+    }
+    
+    // We're done if we're not setting status bits
+    // N.B.: Ignore the S bit if dest == PC, so that we dont get status bit
+    //       confusion when you branch or something.
+    if (!s || d == kPCCode) return (cycles);
+    
+    // Set status bits
+    // There are two cases, logical and arithmetic
+    if (arithmetic)
+    {
+        // Set V if there was an overflow into the 31st bit
+        // My understanding of this is that if 31st bit was NOT
+        // set in *source, but is in *dest, set V
+        if (*dest & 0x80000000)
+        {
+            if (!(*source & 0x80000000))
+                _psr |= kPSRVBit;
+            
+            // Also, set the negative bit
+            _psr |= kPSRNBit;
+        } else {
+            
+            // Z flag set if dest is zero
+            if (*dest == 0x0) {
+                _psr |= kPSRZBit;
+            } else {
+                // As long as we're not zero, we might be super large
+                // The C flag is the carry out of bit 31
+                if (*dest < *source)
+                {
+                    _psr |= kPSRCBit;
+                } else if (C_SET) {
+                    // Flip the c bit cause we didn't overflow
+                    _psr ^= kPSRCBit;
+                }
+            }
+            
+            // Result is not 'negative'
+            if (N_SET)
+                // flip the NBit
+                _psr ^= kPSRNBit;
+        }
+        
+    } else {
+        // We're a logical operation
+        
+        // C flag is the carry out of the shifter, as long as the shift
+        // operation is not LSL #0
+        
+        // Z flag is set if result is all zeros
+        
+        // N flag is set to the logical value of bit 31 of the result
+    }
+    
+    return (cycles);
 }
 
 size_t VirtualMachine::execute()
@@ -40,48 +250,44 @@ size_t VirtualMachine::execute()
     size_t cycles = 0;
     
     // Mask the op code (least significant nybble in the most significant byte)
-    unsigned int opcode = _ir && 0x0F000000;
+    unsigned int opcode = _ir && kOpCodeMask;
     
-    // Move the op code down so we can talk about it in decimal
-    opcode = opcode >> 24;
-    
-    if (opcode < 4)
+    // Parse the Operation Code
+    // Test to see if it has a 0 in the first place of the opcode
+    if (opcode & 0x08000000 == 0x0)
     {
-        // its a data processing operation
-        
-        return (cycles);
-    }
-    
-    if (opcode < 8)
-    {
-        // it's single transfer
-        
-        return (cycles);
-    }
-    
-    if (opcode < 14)
-    {
-        if (opcode < 10)
+        // We're either a data processing or single transfer operation
+        if (opcode & 0x04000000 == 0x04000000)
         {
-            // This is reserved space
+            // We're a single transfer
+            
+            return (cycles);
+        } else {
+            // Only other case is a data processing op
+            // extract all operands and flags
+            bool I = (_ir & kDPIFlagMask) ? true : false;
+            bool S = (_ir & kDPSFlagMask) ? true : false;
+            char op =  ( (_ir & kDPOpCodeMask) >> 21 );
+            char source =  ( (_ir & kDPSourceMask) >> 15 );
+            char dest = ( (_ir & kDPDestMask) >> 10);
+            unsigned int op2 = ( (_ir & kDPOperandTwoMask) );
+            return (dataProcessing(I, S, op, source, dest, op2));
+        }
+    } else if (opcode & kBranchMask == 0x0) {
+        if (opcode & kReservedSpaceMask == 0x0)
+        {
             fprintf(stderr, "Attempt to execute a reserved operation.\n");
             return (cycles);
         }
-        // it's a branch
+        // We're a branch
         
         return (cycles);
-    }
-    
-    if (opcode == 14)
-    {
-        // it's a floating point op
+    } else if (opcode & kFloatingPointMask == 0x0) {
+        // We're a floating point operation
         
         return (cycles);
-    }
-    
-    if (opcode == 15)
-    {
-        // it's a sw interrupt
+    } else {
+        // We're a SW interrupt
         
         return (cycles);
     }
