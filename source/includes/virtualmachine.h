@@ -13,11 +13,23 @@
 
 // Memory constants, in bytes
 #define kDefaultStackSpace 256
-#define kMinimumMemorySize 524288
+#define kMinimumMemorySize 524288 
 
 enum VMComponantTimings {
     kMMUReadClocks = 100,
     kMMUWriteClocks = 100
+};
+
+enum VMRegisterDefaults {
+    kPSRDefault = 0x4000
+};
+
+enum InstructionOpCodeMasks {
+    kDataProcessingMask = 0xF3FFFFFF,
+    kSingleTransferMask = 0xF7FFFFFF,
+    kBranchMask         = 0xFBFFFFFF,
+    kFloatingPointMask  = 0xFEFFFFFF,
+    kSWInterruptMask    = 0xFFFFFFFF
 };
 
 // Forward class definitions
@@ -40,7 +52,8 @@ public:
     char *operation, *response;
     size_t opsize, respsize;
 private:
-    
+    bool evaluateConditional();
+    size_t execute();
     
     MMU *mmu;
     MonitorServer *ms;
@@ -50,7 +63,7 @@ private:
     unsigned int _r[16], _pq[2], _pc, _psr, _cs, _ds, _ss;
     
     // storage registers
-    unsigned int ir;
+    unsigned int _ir;
     
     // information about memory
     size_t _int_table_size, _int_function_size;

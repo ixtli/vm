@@ -4,6 +4,89 @@
 
 VirtualMachine *vm = NULL;
 
+bool VirtualMachine::evaluateConditional()
+{
+    // Evaluate the condition code in the IR
+    // Get the most significant nybble of the instruction by masking
+    unsigned int cond = 0xF0000000;
+    cond = _ir && cond;
+    
+    // Shift the MSN into the LSN 
+    cond = cond >> 28;
+    
+    // Test for two conditions that have nothing to do with the PSR
+    // Always (most common case)
+    if (cond == 0xE)
+        return (true);
+    
+    // Never ("no op")
+    if (cond == 0xF)
+        return (false);
+    
+    // Cond is now our index into the PSR.
+    unsigned int one = 1;
+    one = one << cond;
+    // If the bit at that index is flipped, execute the instruction
+    if (_psr && one)
+        return (true);
+    
+    // Otherwise, don't do it
+    return (false);
+}
+
+size_t VirtualMachine::execute()
+{
+    // return this to tell how many cycles the op took
+    size_t cycles = 0;
+    
+    // Mask the op code (least significant nybble in the most significant byte)
+    unsigned int opcode = _ir && 0x0F000000;
+    
+    // Move the op code down so we can talk about it in decimal
+    opcode = opcode >> 24;
+    
+    if (opcode < 4)
+    {
+        // its a data processing operation
+        
+        return (cycles);
+    }
+    
+    if (opcode < 8)
+    {
+        // it's single transfer
+        
+        return (cycles);
+    }
+    
+    if (opcode < 14)
+    {
+        if (opcode < 10)
+        {
+            // This is reserved space
+            fprintf(stderr, "Attempt to execute a reserved operation.\n");
+            return (cycles);
+        }
+        // it's a branch
+        
+        return (cycles);
+    }
+    
+    if (opcode == 14)
+    {
+        // it's a floating point op
+        
+        return (cycles);
+    }
+    
+    if (opcode == 15)
+    {
+        // it's a sw interrupt
+        
+        return (cycles);
+    }
+}
+
 VirtualMachine::VirtualMachine()
 {
     
@@ -46,6 +129,9 @@ bool VirtualMachine::init(  const char *mem_in, const char *mem_out,
     
     dump_path = mem_out;
     
+    // Init cycle count
+    _cycle_count = 0;
+    
     printf("Loading interrupt table.\n");
     // Load interupts and corresponding functions
     _int_table_size = 0;
@@ -67,6 +153,9 @@ bool VirtualMachine::init(  const char *mem_in, const char *mem_out,
     _cs = _pc;
     _ds = _pc + code_seg_size;
     
+    // Set up PSR
+    _psr = kPSRDefault;
+    
     // No errors
     return (false);
 }
@@ -75,7 +164,18 @@ void VirtualMachine::run()
 {
     printf("Running...\n");
     
-    // Fetch execute
+    while (true)
+    {
+        // Fetch PC instruction into IR and increment the pc
+        _cycle_count += mmu->read(++_pc, _ir);
+
+        // If the cond code precludes execution of the op, don't bother
+        if (!evaluateConditional())
+            continue;
+        
+        // Do the op
+        _cycle_count += execute();
+    }
     
     while (!terminate)
     {
