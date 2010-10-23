@@ -11,6 +11,10 @@
 #define kReadCommand    "READ"
 #define kRangeCommand   "RANGE"
 
+// Memory constants, in bytes
+#define kDefaultStackSpace 256
+#define kMinimumMemorySize 524288
+
 enum VMComponantTimings {
     kMMUReadClocks = 100,
     kMMUWriteClocks = 100
@@ -36,9 +40,23 @@ public:
     char *operation, *response;
     size_t opsize, respsize;
 private:
+    
+    
     MMU *mmu;
     MonitorServer *ms;
     const char *dump_path;
+    
+    // registers modifiable by client
+    unsigned int _r[16], _pq[2], _pc, _psr, _cs, _ds, _ss;
+    
+    // storage registers
+    unsigned int ir;
+    
+    // information about memory
+    size_t _int_table_size, _int_function_size;
+    
+    // state info
+    size_t _cycle_count;
 };
 
 // Main VM context

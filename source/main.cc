@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
     char c;
     char *outpath = NULL;
     char *inpath = NULL;
-    size_t mem_size = 256;
+    size_t mem_size = kMinimumMemorySize;
     
     // Register signal
     void sigint_handler(int sig);
@@ -57,10 +57,10 @@ int main(int argc, char *argv[])
             
             case 'm':
             mem_size = atoi(optarg);
-            if (mem_size == 0)
+            if (mem_size < kMinimumMemorySize)
             {
-                printf("Memory size argument evaluated to zero.  Using 256kb.\n");
-                mem_size = 256000;
+                printf("Memory size argument less than minimum.  Defaults.\n");
+                mem_size = kMinimumMemorySize;
             }
             break;
             

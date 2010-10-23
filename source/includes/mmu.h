@@ -11,7 +11,7 @@ public:
     
     bool init();
     
-    bool loadFile(const char *path);
+    size_t loadFile(const char *path, size_t to);
     bool writeOut(const char *path);
     
     // Operational: must return the timing

@@ -37,12 +37,18 @@ bool MMU::init()
     return (false);
 }
 
-bool MMU::loadFile(const char *path)
+size_t MMU::loadFile(const char *path, size_t to)
 {
     char buffer[256];
     std::ifstream myfile(path);
     
     int i = 0;
+    
+    if (to >= _memory_size )
+    {
+        fprintf(stderr, "Tried to load memory image file outside of memory.\n");
+        return (i);
+    }
     
     printf("Loading memory image '%s'... ", path);
     
@@ -55,7 +61,7 @@ bool MMU::loadFile(const char *path)
     myfile.close();
     printf("Done.\n");
     
-    return (false);
+    return (i);
 }
 
 bool MMU::writeOut(const char *path)
@@ -127,3 +133,4 @@ size_t MMU::readRange(size_t start, size_t end, bool hex, char **ret)
     
     return (_read_time * words);
 }
+

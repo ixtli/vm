@@ -46,7 +46,26 @@ bool VirtualMachine::init(  const char *mem_in, const char *mem_out,
     
     dump_path = mem_out;
     
-    mmu->loadFile(mem_in);
+    printf("Loading interrupt table.\n");
+    // Load interupts and corresponding functions
+    _int_table_size = 0;
+    printf("Loading interrupt functions.\n");
+    _int_function_size = 0;
+    
+    // TODO:  Have the machine do this at start up
+    // Set up a sane operating environment
+    
+    // Start the program at the byte after the end of the interrupt functions
+    _pc = 0x0;
+    
+    // Advance pc to allocate stack space
+    _ss = _pc;
+    _pc += kDefaultStackSpace;
+    
+    // Load memory image at PC.
+    size_t code_seg_size = mmu->loadFile(mem_in, _pc);
+    _cs = _pc;
+    _ds = _pc + code_seg_size;
     
     // No errors
     return (false);
@@ -55,6 +74,8 @@ bool VirtualMachine::init(  const char *mem_in, const char *mem_out,
 void VirtualMachine::run()
 {
     printf("Running...\n");
+    
+    // Fetch execute
     
     while (!terminate)
     {
