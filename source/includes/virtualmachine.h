@@ -7,6 +7,8 @@
 #include "server.h"
 #include "mmu.h"
 
+#define kIntSize        sizeof(unsigned int)
+
 #define kWriteCommand   "WRITE"
 #define kReadCommand    "READ"
 #define kRangeCommand   "RANGE"
@@ -25,7 +27,9 @@ enum VMSizeMasks {
 };
 
 enum VMMathMasks {
-    kSignBitMask        = 0x80000000
+    kSignBitMask        = 0x80000000,
+    kMSBMask            = 0x80000000,
+    kLSBMask            = 0x00000001
 };
 
 enum VMPSRBits {
@@ -76,13 +80,26 @@ enum DataProcessingMasks {
     kDPOperandTwoMask   = 0x000003FF
 };
 
+enum ShifterMasks {
+    kShiftImmediateMask = 0x000000FF,
+    kShiftRotateMask    = 0x00000300,
+    kShiftRmMask        = 0x0000001F,
+    kShiftOpMask        = 0x00000060,
+    kShiftRsMask        = 0x00000380
+};
+
+enum ShiftOperations {
+    kShiftLSL, kShiftLSR, kShiftASR, kShiftROR
+};
+
 enum DataProcessingOpCodes {
     kADD, kSUB, kMOD, kMUL, kDIV, kAND, kORR, kNOT,
     kXOR, kCMP, kCMN, kTST, kTEQ, kMOV, kBIC, kNOP
 };
 
 enum DataProcessingTimings {
-    kADDCycles          = 1
+    kADDCycles          = 1,
+    kANDCycles          = 1
 };
 
 // Forward class definitions
@@ -110,7 +127,7 @@ public:
 private:
     bool evaluateConditional();
     size_t execute();
-    size_t shiftOffset(unsigned int &offset);
+    void shiftOffset(unsigned int &offset, bool immediate);
     size_t dataProcessing(bool I, bool S, char op, char s, char d,
         unsigned int &op2);
     
