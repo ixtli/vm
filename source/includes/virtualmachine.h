@@ -5,7 +5,6 @@
 
 #include "global.h"
 #include "server.h"
-#include "mmu.h"
 
 #define kWriteCommand   "WRITE"
 #define kReadCommand    "READ"
@@ -53,8 +52,9 @@ enum VMRegisterCodes {
 };
 
 enum VMComponantTimings {
-    kMMUReadClocks = 100,
-    kMMUWriteClocks = 100
+    kMMUReadClocks      = 100,
+    kMMUWriteClocks     = 100,
+    kMMUAbortCycles     = 10
 };
 
 enum VMRegisterDefaults {

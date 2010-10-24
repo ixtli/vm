@@ -12,16 +12,6 @@ enum DataProcessingMasks {
     kDPOperandTwoMask   = 0x000003FF
 };
 
-enum SingleTransferMasks {
-    kSTIFlagMask        = 0x02000000,
-    
-    
-    
-    kSTPFlagMask        = 0x000F8000,
-    kSTSourceMask       = 0x000F8000,
-    kSTDestMask         = 0x00007000
-};
-
 enum ShifterMasks {
     kShiftImmediateMask = 0x000000FF,
     kShiftRotateMask    = 0x00000300,

@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include "includes/virtualmachine.h"
+#include "includes/mmu.h"
 #include "includes/alu.h"
 
 // Macros for checking the PSR
@@ -144,9 +145,17 @@ size_t VirtualMachine::execute()
         if (opcode & 0x04000000 == 0x04000000)
         {
             // We're a single transfer
-            
-            
-            return (cycles);
+            STFlags f;
+            f.I = (_ir & kSTIFlagMask) ? true : false;
+            f.L = (_ir & kSTLFlagMask) ? true : false;
+            f.W = (_ir & kSTWFlagMask) ? true : false;
+            f.B = (_ir & kSTBFlagMask) ? true : false;
+            f.U = (_ir & kSTUFlagMask) ? true : false;
+            f.P = (_ir & kSTPFlagMask) ? true : false;
+            f.rs = (_ir & kSTSourceMask) >> 15;
+            f.rd = (_ir & kSTDestMask) >> 10;
+            f.offset = (_ir & kSTOffsetMask);
+            return (mmu->singleTransfer(&f));
         } else {
             // Only other case is a data processing op
             // extract all operands and flags
@@ -216,7 +225,7 @@ bool VirtualMachine::init(  const char *mem_in, const char *mem_out,
     if (alu->init()) return (true);
     
     // Init memory
-    mmu = new MMU(mem_size, kMMUReadClocks, kMMUWriteClocks);
+    mmu = new MMU(this, mem_size, kMMUReadClocks, kMMUWriteClocks);
     if (mmu->init()) return (true);
     
     dump_path = mem_out;
