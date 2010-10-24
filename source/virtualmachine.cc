@@ -174,6 +174,25 @@ size_t VirtualMachine::execute()
             return (cycles);
         }
         // We're a branch
+        if (_ir & kBranchLBitMask)
+            // Store current pc in the link register (r15)
+            _r[15] = _pc;
+        
+        // Left shift the address by two because instructions are word-aligned
+        int temp = (_ir & kBranchOffsetMask) << 2;
+        
+        // Temp is now a 25-bit number, but needs to be sign extended to 32 bits
+        // we do this with a little struct trick that will PROBABLY work
+        // everywhere.
+        struct {signed int x:25;} s;
+        signed int addr = s.x = temp;
+        
+        // Add the computed address to the pc and make sure it's not negative
+        addr += (signed int)_pc;
+        if (addr < 0)
+            _pc = 0;
+        else
+            _pc = addr;
         
         return (cycles);
     } else if (opcode & kFloatingPointMask == 0x0) {

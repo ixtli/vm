@@ -71,6 +71,11 @@ enum InstructionOpCodeMasks {
     kSWInterruptMask    = 0x00000000
 };
 
+enum BranchMasks {
+    kBranchLBitMask     = 0x01000000,
+    kBranchOffsetMask   = 0x00FFFFFF
+};
+
 // Forward class definitions
 class MonitorServer;
 class ALU;
