@@ -3,6 +3,7 @@
 #include "includes/virtualmachine.h"
 #include "includes/mmu.h"
 #include "includes/alu.h"
+#include "includes/fpu.h"
 
 // Macros for checking the PSR
 #define N_SET     (_psr & kPSRNBit)
@@ -133,16 +134,13 @@ size_t VirtualMachine::execute()
     // return this to tell how many cycles the op took
     size_t cycles = 0;
     
-    // Mask the op code (least significant nybble in the most significant byte)
-    reg_t opcode = _ir && kOpCodeMask;
-    
     // Parse the Operation Code
     // Test to see if it has a 0 in the first place of the opcode
-    if (opcode & 0x08000000 == 0x0)
+    if (_ir & 0x08000000 == 0x0)
     {
         // We're either a data processing or single transfer operation
         // Test to see if there is a 1 in the second place of the opcode
-        if (opcode & 0x04000000 == 0x04000000)
+        if (_ir & kSingleTransferMask)
         {
             // We're a single transfer
             STFlags f;
@@ -167,8 +165,8 @@ size_t VirtualMachine::execute()
             reg_t op2 = ( (_ir & kDPOperandTwoMask) );
             return (alu->dataProcessing(I, S, op, source, dest, op2));
         }
-    } else if (opcode & kBranchMask == 0x0) {
-        if (opcode & kReservedSpaceMask == 0x0)
+    } else if (_ir & kBranchMask == 0x0) {
+        if (_ir & kReservedSpaceMask == 0x0)
         {
             fprintf(stderr, "Attempt to execute a reserved operation.\n");
             return (cycles);
@@ -195,10 +193,14 @@ size_t VirtualMachine::execute()
             _pc = addr;
         
         return (cycles);
-    } else if (opcode & kFloatingPointMask == 0x0) {
+    } else if (_ir & kFloatingPointMask == 0x0) {
         // We're a floating point operation
-        
-        return (cycles);
+        char op = ((_ir & kFPOpcodeMask) >> 20);
+        char fps = ((_ir & kFPsMask) >> 17);
+        char fpd = ((_ir & kFPdMask) >> 14);
+        char fpn = ((_ir & kFPnMask) >> 11);
+        char fpm = ((_ir & kFPmMask) >> 8);
+        return (fpu->execute(op, _fpr[fps], _fpr[fpd], _fpr[fpn], _fpr[fpm]));
     } else {
         // We're a SW interrupt
         
@@ -242,6 +244,10 @@ bool VirtualMachine::init(  const char *mem_in, const char *mem_out,
     // Start up ALU
     alu = new ALU(this);
     if (alu->init()) return (true);
+    
+    // Start up FPU
+    fpu = new FPU(this);
+    if (fpu->init()) return (true);
     
     // Init memory
     mmu = new MMU(this, mem_size, kMMUReadClocks, kMMUWriteClocks);

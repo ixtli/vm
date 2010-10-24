@@ -64,7 +64,7 @@ enum VMRegisterDefaults {
 enum InstructionOpCodeMasks {
     kOpCodeMask         = 0x0F000000,
     kDataProcessingMask = 0x0C000000,
-    kSingleTransferMask = 0x08000000,
+    kSingleTransferMask = 0x04000000,
     kBranchMask         = 0x04000000,
     kFloatingPointMask  = 0x01000000,
     kReservedSpaceMask  = 0x06000000,
@@ -80,6 +80,7 @@ enum BranchMasks {
 class MonitorServer;
 class ALU;
 class MMU;
+class FPU;
 
 class VirtualMachine
 {
@@ -136,6 +137,7 @@ private:
     
     MMU *mmu;
     ALU *alu;
+    FPU *fpu;
     MonitorServer *ms;
     const char *dump_path;
     
