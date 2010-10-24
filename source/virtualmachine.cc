@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include "includes/virtualmachine.h"
+#include "includes/alu.h"
 
 // Macros for checking the PSR
 #define N_SET     (_psr & kPSRNBit)
@@ -11,42 +12,14 @@
 #define C_CLEAR  !(_psr & kPSRCBit)
 #define Z_SET     (_psr & kPSRZBit)
 #define Z_CLEAR  !(_psr & kPSRZBit)
-#define NVCZ_MASK (kPSRNBit & kPSRVBit & kPSRCBit & kPSRZBit)
 
 VirtualMachine *vm = NULL;
-
-inline unsigned int *VirtualMachine::selectRegister(char val)
-{
-    if (val < kPQ0Code)
-        // This is a general register
-        return (&_r[val]);
-    
-    if (val > kFPSRCode)
-        // This is an fpu register
-        return (&_fpr[val - kFPR0Code]);
-    
-    switch (val)
-    {
-        case kPSRCode:
-        return (&_psr);
-        case kPQ0Code:
-        return (&_pq[0]);
-        case kPQ1Code:
-        return (&_pq[1]);
-        case kPCCode:
-        return (&_pc);
-        case kFPSRCode:
-        return (&_fpsr);
-        default:
-        return (NULL);
-    }
-}
 
 bool VirtualMachine::evaluateConditional()
 {
     // Evaluate the condition code in the IR
     // Get the most significant nybble of the instruction by masking
-    unsigned int cond = 0xF0000000;
+    reg_t cond = 0xF0000000;
     cond = _ir && cond;
     
     // Shift the MSN into the LSN 
@@ -154,195 +127,13 @@ bool VirtualMachine::evaluateConditional()
     }
 }
 
-void VirtualMachine::shiftOffset(unsigned int &offset, bool immediate)
-{
-    // Perform the somewhat complex operation of barrel shifting the offset
-    // return the carry out of the shift operation
-    bool carry_bit = false;
-    
-    // Simplest case is when the offset is treated like an immediate
-    if (immediate)
-    {
-        // Lower 8 bits of op2 is an immediate value
-        unsigned int imm = (offset & kShiftImmediateMask);
-        // Upper two bits is a rotate value between 0 and 4
-        unsigned int ror = (offset & kShiftRotateMask) >> 8;
-        
-        // If the following is one op, then checking for zero would
-        // just be more code for no added efficiency
-        
-        // Apparently most compilers will recognize the following idiom
-        // and compile it into a single ROL operation 
-        imm = (imm >> ror) | (imm << (kIntSize - ror));
-        
-        // Store the value
-        offset = imm;
-        
-        // If we're rotating then there is no carry
-    } else {
-        // We need to do a more complex operation
-        unsigned int operation = (offset & kShiftOpMask) >> 5;
-        unsigned int *value = selectRegister(offset & kShiftRmMask);
-        unsigned int *shift = selectRegister((offset & kShiftRsMask) >> 7);
-        unsigned int mask;
-        
-        // Shifting zero is a special case where you dont touch the C bit
-        if (*shift == 0)
-        {
-            offset = *value;
-            return;
-        }
-    
-        switch (operation)
-        {
-            case kShiftLSL:
-            offset = (*value << *shift);
-            // Least significant discarded bit becomes the carry-out
-            mask = kOne << (kIntSize - *shift - 2);
-            if (*value & mask)
-                carry_bit = true;
-            break;
-        
-            case kShiftASR:
-            offset = (*value >> *shift);
-            // Sign extend by filling in vacant bits with original sign bit
-            // Get a mask of the now-empty bits
-            mask = kWordMask << (kIntSize - *shift);
-            
-            // If there was a sign bit, make all empty bits 1
-            // otherwise leave it as zeros
-            if (*value & kSignBitMask)
-                offset |= mask;
-            
-            // Then use the MSB of the discarded portion as the carry
-            mask = kOne << (*shift - 1);
-            if (*value & mask)
-                carry_bit = true;
-            break;
-        
-            case kShiftLSR:
-            // Same thing as LSL, but check the MSB of the discarded portion
-            offset = (*value >> *shift);
-            mask = kOne << (*shift - 1);
-            if (*value & mask)
-                carry_bit = true;
-            break;
-            
-            case kShiftROR:
-            default:
-            // Do a normal rotate right
-            offset = (*value >> *shift) | (*value >> (kIntSize - *shift));
-            // However, selection for the carry bit is the same as in LSR
-            mask = kOne << (*shift - 1);
-            if (*value & mask)
-                carry_bit = true;
-            break;
-        }
-    }
-    
-    if (carry_bit)
-        _psr = C_SET;
-    else
-        _psr = C_CLEAR;
-    
-    return;
-}
-
-size_t VirtualMachine::dataProcessing(bool I, bool S, char op,
-    char s, char d, unsigned int &op2)
-{
-    size_t cycles = 0;
-    bool shift_carry = false;
-    bool arithmetic = false;
-    unsigned int *dest = selectRegister(d);
-    unsigned int *source = selectRegister(s);
-    
-    // Barrel shift (This may modify the carry bit!)
-    shiftOffset(op2, I);
-    
-    switch (op)
-    {
-        case kADD:
-        arithmetic = true;
-        *dest = *source + op2;
-        cycles += kADDCycles;
-        break;
-        
-        case kAND:
-        arithmetic = false;
-        *dest = *source & op2;
-        cycles += kANDCycles;
-        break;
-        
-        case kNOP:
-        default:
-        break;
-    }
-    
-    // We're done if we're not setting status bits
-    // N.B.: Ignore the S bit if dest == PC, so that we dont get status bit
-    //       confusion when you branch or something.
-    if (!s || d == kPCCode) return (cycles);
-    
-    // Reset status bits that are effected
-    _psr &= ~NVCZ_MASK;
-    
-    // Set status bits
-    // There are two cases, logical and arithmetic
-    if (arithmetic)
-    {
-        // Set V if there was an overflow into the 31st bit
-        // My understanding of this is that if 31st bit was NOT
-        // set in *source, but is in *dest, set V
-        if (*dest & kMSBMask)
-        {
-            if (!(*source & kMSBMask))
-                _psr |= kPSRVBit;
-            
-            // Also, set the negative bit
-            _psr |= kPSRNBit;
-        } else {
-            
-            // Z flag set if dest is zero
-            if (*dest == 0x0) {
-                _psr |= kPSRZBit;
-            } else {
-                // As long as we're not zero, we might be super large
-                // The C flag is the carry out of bit 31
-                if (*dest < *source)
-                {
-                    _psr |= kPSRCBit;
-                }
-            }
-        }
-        
-    } else {
-        // We're a logical operation
-        // C flag is the carry out of the shifter, as long as the shift
-        // operation is not LSL #0
-        if (shift_carry)
-            _psr |= kPSRCBit;
-        
-        // Z flag is set if result is all zeros
-        if (*dest == 0x0)
-            _psr |= kPSRZBit;
-        
-        // N flag is set to the logical value of bit 31 of the result
-        if (*dest & kMSBMask)
-            _psr |= kPSRNBit;
-        
-        // (V Flag is uneffected by logical operations)
-    }
-    return (cycles);
-}
-
 size_t VirtualMachine::execute()
 {
     // return this to tell how many cycles the op took
     size_t cycles = 0;
     
     // Mask the op code (least significant nybble in the most significant byte)
-    unsigned int opcode = _ir && kOpCodeMask;
+    reg_t opcode = _ir && kOpCodeMask;
     
     // Parse the Operation Code
     // Test to see if it has a 0 in the first place of the opcode
@@ -354,6 +145,7 @@ size_t VirtualMachine::execute()
         {
             // We're a single transfer
             
+            
             return (cycles);
         } else {
             // Only other case is a data processing op
@@ -363,8 +155,8 @@ size_t VirtualMachine::execute()
             char op =  ( (_ir & kDPOpCodeMask) >> 21 );
             char source =  ( (_ir & kDPSourceMask) >> 15 );
             char dest = ( (_ir & kDPDestMask) >> 10);
-            unsigned int op2 = ( (_ir & kDPOperandTwoMask) );
-            return (dataProcessing(I, S, op, source, dest, op2));
+            reg_t op2 = ( (_ir & kDPOperandTwoMask) );
+            return (alu->dataProcessing(I, S, op, source, dest, op2));
         }
     } else if (opcode & kBranchMask == 0x0) {
         if (opcode & kReservedSpaceMask == 0x0)
@@ -387,9 +179,7 @@ size_t VirtualMachine::execute()
 }
 
 VirtualMachine::VirtualMachine()
-{
-    
-}
+{}
 
 VirtualMachine::~VirtualMachine()
 {
@@ -421,10 +211,13 @@ bool VirtualMachine::init(  const char *mem_in, const char *mem_out,
     
     printf("Initializing virtual machine...\n");
     
+    // Start up ALU
+    alu = new ALU(this);
+    if (alu->init()) return (true);
+    
     // Init memory
     mmu = new MMU(mem_size, kMMUReadClocks, kMMUWriteClocks);
-    if (mmu->init())
-        return (true);
+    if (mmu->init()) return (true);
     
     dump_path = mem_out;
     
@@ -511,7 +304,7 @@ void VirtualMachine::run()
             } else if (strcmp(pch, kReadCommand) == 0) {
                 // read
                 int addr;
-                unsigned int val;
+                reg_t val;
                 pch = strtok(NULL, " ");
                 if (pch)
                     addr = atoi(pch);

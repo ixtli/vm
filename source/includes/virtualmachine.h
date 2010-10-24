@@ -7,8 +7,6 @@
 #include "server.h"
 #include "mmu.h"
 
-#define kIntSize        sizeof(unsigned int)
-
 #define kWriteCommand   "WRITE"
 #define kReadCommand    "READ"
 #define kRangeCommand   "RANGE"
@@ -38,6 +36,8 @@ enum VMPSRBits {
     kPSRNBit            = 0x00000004,
     kPSRVBit            = 0x00000008
 };
+
+#define NVCZ_MASK (kPSRNBit & kPSRVBit & kPSRCBit & kPSRZBit)
 
 enum VMOpPrefixConditions {
     kCondEQ, kCondNE, kCondCS, kCondCC, kCondMI, kCondPL, kCondVS, kCondVC, 
@@ -71,39 +71,10 @@ enum InstructionOpCodeMasks {
     kSWInterruptMask    = 0x00000000
 };
 
-enum DataProcessingMasks {
-    kDPIFlagMask        = 0x02000000,
-    kDPOpCodeMask       = 0x01E00000,
-    kDPSFlagMask        = 0x00100000,
-    kDPSourceMask       = 0x000F8000,
-    kDPDestMask         = 0x00007C00,
-    kDPOperandTwoMask   = 0x000003FF
-};
-
-enum ShifterMasks {
-    kShiftImmediateMask = 0x000000FF,
-    kShiftRotateMask    = 0x00000300,
-    kShiftRmMask        = 0x0000001F,
-    kShiftOpMask        = 0x00000060,
-    kShiftRsMask        = 0x00000380
-};
-
-enum ShiftOperations {
-    kShiftLSL, kShiftLSR, kShiftASR, kShiftROR
-};
-
-enum DataProcessingOpCodes {
-    kADD, kSUB, kMOD, kMUL, kDIV, kAND, kORR, kNOT,
-    kXOR, kCMP, kCMN, kTST, kTEQ, kMOV, kBIC, kNOP
-};
-
-enum DataProcessingTimings {
-    kADDCycles          = 1,
-    kANDCycles          = 1
-};
-
 // Forward class definitions
 class MonitorServer;
+class ALU;
+class MMU;
 
 class VirtualMachine
 {
@@ -115,9 +86,39 @@ public:
     void run();
     
     // Helper methods that might be nice for other things...
-    inline unsigned int *selectRegister(char val);
+    inline reg_t *selectRegister(char val)
+    {
+        if (val < kPQ0Code)
+            // This is a general register
+            return (&_r[val]);
+
+        if (val > kFPSRCode)
+            // This is an fpu register
+            return (&_fpr[val - kFPR0Code]);
+
+        switch (val)
+        {
+            case kPSRCode:
+            return (&_psr);
+            case kPQ0Code:
+            return (&_pq[0]);
+            case kPQ1Code:
+            return (&_pq[1]);
+            case kPCCode:
+            return (&_pc);
+            case kFPSRCode:
+            return (&_fpsr);
+            default:
+            return (NULL);
+        }
+    }
     
-    // The following is a hack, I think!
+    // Every other part of the machine can play with this at will
+    // thus it shouldn't ever be read from except at the very
+    // beginning of the execution phase
+    reg_t _psr;
+    
+    // SIGINT flips this to tell everything to turn off
     volatile sig_atomic_t terminate;
     
     pthread_mutex_t waiting;
@@ -127,21 +128,18 @@ public:
 private:
     bool evaluateConditional();
     size_t execute();
-    void shiftOffset(unsigned int &offset, bool immediate);
-    size_t dataProcessing(bool I, bool S, char op, char s, char d,
-        unsigned int &op2);
-    
     
     MMU *mmu;
+    ALU *alu;
     MonitorServer *ms;
     const char *dump_path;
     
     // registers modifiable by client
-    unsigned int _r[16], _pq[2], _pc, _psr, _cs, _ds, _ss;
-    unsigned int _fpsr, _fpr[8];
+    reg_t _r[16], _pq[2], _pc, _cs, _ds, _ss;
+    reg_t _fpsr, _fpr[8];
     
     // storage registers
-    unsigned int _ir;
+    reg_t _ir;
     
     // information about memory
     size_t _int_table_size, _int_function_size;

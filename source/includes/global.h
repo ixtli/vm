@@ -11,4 +11,8 @@
 TypeName(const TypeName&);\
 void operator=(const TypeName&)
 
+typedef unsigned int reg_t;
+
+#define kRegSize   sizeof(register_t)
+
 #endif
