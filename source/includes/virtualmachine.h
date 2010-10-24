@@ -78,6 +78,7 @@ enum BranchMasks {
 
 // Forward class definitions
 class MonitorServer;
+class InterruptController;
 class ALU;
 class MMU;
 class FPU;
@@ -90,6 +91,8 @@ public:
 
     bool init(const char *mem_in, const char *mem_out, size_t mem_size);
     void run();
+    void installJumpTable(reg_t *data, size_t size);
+    void installIntFunctions(reg_t *data, size_t size);
     
     // Helper methods that might be nice for other things...
     inline reg_t *selectRegister(char val)
@@ -123,6 +126,7 @@ public:
     // thus it shouldn't ever be read from except at the very
     // beginning of the execution phase
     reg_t _psr;
+    bool supervisor, fex;
     
     // SIGINT flips this to tell everything to turn off
     volatile sig_atomic_t terminate;
@@ -134,10 +138,12 @@ public:
 private:
     bool evaluateConditional();
     size_t execute();
+    void eval(char *op);
     
     MMU *mmu;
     ALU *alu;
     FPU *fpu;
+    InterruptController *icu;
     MonitorServer *ms;
     const char *dump_path;
     

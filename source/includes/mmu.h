@@ -42,7 +42,9 @@ public:
     // Operational: must return the timing
     size_t singleTransfer(const STFlags *f);
     size_t write(size_t addr, unsigned int valueToSave);
-    size_t read(size_t addr, unsigned int &valueToRet);
+    size_t writeBlock(size_t addr, reg_t *data, size_t size);
+    size_t readWord(size_t addr, unsigned int &valueToRet);
+    size_t readByte(size_t addr, char &valueToRet);
     size_t readRange(size_t start, size_t end, bool hex, char **ret);
 
 private:
@@ -51,7 +53,7 @@ private:
     
     VirtualMachine *_vm;
     size_t _memory_size, _read_time, _write_time;
-    unsigned int *_memory;
+    reg_t *_memory;
 };
 
 #endif

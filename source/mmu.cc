@@ -95,12 +95,33 @@ size_t MMU::write(size_t addr, unsigned int valueToSave)
     return (_write_time);
 }
 
-size_t MMU::read(size_t addr, unsigned int &valueToRet)
+size_t MMU::writeBlock(size_t addr, reg_t *data, size_t size)
+{
+    if ((addr + size * kRegSize) >= _memory_size)
+        return 0;
+    
+    for (int i = 0; i < size; i++)
+        _memory[i+addr] = data[i];
+    
+    return (_write_time);
+}
+
+size_t MMU::readWord(size_t addr, reg_t &valueToRet)
+{
+    if ((addr * kRegSize) >= _memory_size)
+        return 0;
+    
+    valueToRet = _memory[addr];
+
+    return (_read_time);
+}
+
+size_t MMU::readByte(size_t addr, char &valueToRet)
 {
     if (addr >= _memory_size)
         return 0;
     
-    valueToRet = _memory[addr];
+    valueToRet = ((char *)_memory)[addr];
 
     return (_read_time);
 }

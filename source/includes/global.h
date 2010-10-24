@@ -13,6 +13,6 @@ void operator=(const TypeName&)
 
 typedef unsigned int reg_t;
 
-#define kRegSize   sizeof(register_t)
+#define kRegSize   sizeof(reg_t)
 
 #endif

@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include "includes/virtualmachine.h"
+#include "includes/interrupt.h"
 #include "includes/mmu.h"
 #include "includes/alu.h"
 #include "includes/fpu.h"
@@ -203,8 +204,9 @@ size_t VirtualMachine::execute()
         return (fpu->execute(op, _fpr[fps], _fpr[fpd], _fpr[fpn], _fpr[fpm]));
     } else {
         // We're a SW interrupt
-        
-        return (cycles);
+        // pc is always saved in r15 before branching
+        _r[15] = _pc;
+        return (icu->swint(_ir & kSWIntCommentMask));
     }
 }
 
@@ -258,17 +260,16 @@ bool VirtualMachine::init(  const char *mem_in, const char *mem_out,
     // Init cycle count
     _cycle_count = 0;
     
-    printf("Loading interrupt table.\n");
-    // Load interupts and corresponding functions
-    _int_table_size = 0;
-    printf("Loading interrupt functions.\n");
-    _int_function_size = 0;
+    printf("Loading interrupt controller.\n");
+    icu = new InterruptController(this);
+    icu->init();
     
     // TODO:  Have the machine do this at start up
     // Set up a sane operating environment
     
     // Start the program at the byte after the end of the interrupt functions
     _pc = 0x0;
+    _pc += _int_table_size + _int_function_size;
     
     // Advance pc to allocate stack space
     _ss = _pc;
@@ -282,18 +283,87 @@ bool VirtualMachine::init(  const char *mem_in, const char *mem_out,
     // Set up PSR
     _psr = kPSRDefault;
     
+    // We can now start the Fetch EXecute cycle
+    fex = true;
+    
     // No errors
     return (false);
+}
+
+void VirtualMachine::eval(char *op)
+{
+    char *pch = strtok(op, " ");
+    if (pch != NULL)
+    {
+        if (strcmp(pch, kWriteCommand) == 0)
+        {
+            int addr, val;
+            pch = strtok(NULL, " ");
+            if (pch)
+                addr = atoi(pch);
+            else
+                addr = 0;
+        
+            pch = strtok(NULL, " ");
+            if (pch)
+                val = atoi(pch);
+            else
+                val = 0;
+        
+            mmu->write(addr, val);
+        
+            response = (char *)malloc(sizeof(char) * 512);
+            sprintf(response, "Value '%i' written to '%#x'.\n",
+                val, addr);
+            respsize = strlen(response);
+        } else if (strcmp(pch, kReadCommand) == 0) {
+            // read
+            int addr;
+            reg_t val;
+            pch = strtok(NULL, " ");
+            if (pch)
+                addr = atoi(pch);
+            else
+                addr = 0;
+        
+            mmu->readWord(addr, val);
+        
+            response = (char *)malloc(sizeof(char) * 512);
+            sprintf(response, "%#x - %i\n", addr, val);
+            respsize = strlen(response);
+        } else if (strcmp(pch, kRangeCommand) == 0) {
+            // range
+            int addr, val;
+            pch = strtok(NULL, " ");
+            if (pch)
+                addr = atoi(pch);
+            else
+                addr = 0;
+        
+            pch = strtok(NULL, " ");
+            if (pch)
+                val = atoi(pch);
+            else
+                val = 0;
+        
+            char *temp;
+            mmu->readRange(addr, val, true, &temp);
+            response = temp;
+            respsize = strlen(response);
+        } else {
+            // unknown command
+            respsize = 0;
+        }
+    }
 }
 
 void VirtualMachine::run()
 {
     printf("Running...\n");
-    
-    while (true)
+    while (fex)
     {
         // Fetch PC instruction into IR and increment the pc
-        _cycle_count += mmu->read(++_pc, _ir);
+        _cycle_count += mmu->readWord(++_pc, _ir);
 
         // If the cond code precludes execution of the op, don't bother
         if (!evaluateConditional())
@@ -302,81 +372,32 @@ void VirtualMachine::run()
         // Do the op
         _cycle_count += execute();
     }
-    
     while (!terminate)
     {
         // Wait for something to happen
         pthread_mutex_lock(&waiting);
         if (terminate)
             return;
-        // If we get here, we have a job to do.
-        char *pch;
-        pch = strtok(operation, " ");
-        if (pch != NULL)
-        {
-            if (strcmp(pch, kWriteCommand) == 0)
-            {
-                int addr, val;
-                pch = strtok(NULL, " ");
-                if (pch)
-                    addr = atoi(pch);
-                else
-                    addr = 0;
-            
-                pch = strtok(NULL, " ");
-                if (pch)
-                    val = atoi(pch);
-                else
-                    val = 0;
-            
-                mmu->write(addr, val);
-            
-                response = (char *)malloc(sizeof(char) * 512);
-                sprintf(response, "Value '%i' written to '%#x'.\n",
-                    val, addr);
-                respsize = strlen(response);
-            } else if (strcmp(pch, kReadCommand) == 0) {
-                // read
-                int addr;
-                reg_t val;
-                pch = strtok(NULL, " ");
-                if (pch)
-                    addr = atoi(pch);
-                else
-                    addr = 0;
-            
-                mmu->read(addr, val);
-            
-                response = (char *)malloc(sizeof(char) * 512);
-                sprintf(response, "%#x - %i\n", addr, val);
-                respsize = strlen(response);
-            } else if (strcmp(pch, kRangeCommand) == 0) {
-                // range
-                int addr, val;
-                pch = strtok(NULL, " ");
-                if (pch)
-                    addr = atoi(pch);
-                else
-                    addr = 0;
-            
-                pch = strtok(NULL, " ");
-                if (pch)
-                    val = atoi(pch);
-                else
-                    val = 0;
-            
-                char *temp;
-                mmu->readRange(addr, val, true, &temp);
-                response = temp;
-                respsize = strlen(response);
-            } else {
-                // unknown command
-                respsize = 0;
-            }
-        }
+        
+        // If we get here, we have a job to do
+        eval(operation);
         
         // we're done
         pthread_mutex_unlock(&waiting);
     }
+}
+
+void VirtualMachine::installJumpTable(reg_t *data, size_t size)
+{
+    mmu->writeBlock(0x0, data, size);
+    _int_table_size = size;
+    printf("%lub interrupt jump table at 0x0.\n", size);
+}
+
+void VirtualMachine::installIntFunctions(reg_t *data, size_t size)
+{
+    mmu->writeBlock(_int_table_size, data, size);
+    _int_function_size = size;
+    printf("%lub interrupt functions at %#x.\n", size, (reg_t)_int_table_size);
 }
 
