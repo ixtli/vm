@@ -9,6 +9,7 @@
 #define kWriteCommand   "WRITE"
 #define kReadCommand    "READ"
 #define kRangeCommand   "RANGE"
+#define kExecCommand    "EXEC"
 
 // Memory constants, in bytes
 #define kMinimumMemorySize 524288 

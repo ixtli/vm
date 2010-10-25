@@ -191,7 +191,7 @@ size_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
 	case kNOT:
         arithmetic = false;
         shiftOffset(op2, I);
-        *dest = *source ~ op2;
+        *dest = ~(*source);
         cycles += kNOTCycles;
         break;
 

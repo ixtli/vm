@@ -358,6 +358,25 @@ void VirtualMachine::eval(char *op)
         response = temp;
         respsize = strlen(response);
         return;
+    } else if (strcmp(pch, kExecCommand) == 0) {
+        reg_t instruction;
+        pch = strtok(NULL, " ");
+        
+        if (pch)
+            instruction = atoi(pch);
+        else
+            instruction = 0;
+        
+        reg_t ir = _ir;
+        _ir = instruction;
+        execute();
+        _ir = ir;
+        
+        response = (char *)malloc(sizeof(char) * strlen(op));
+        strcpy(response, op);
+        respsize = strlen(response);
+        
+        return;
     }
     
     // If nothing worked just send machine status
@@ -423,6 +442,7 @@ void VirtualMachine::run()
             continue;
         
         // If we get here, we have a job to do
+        if (!operation) continue;
         eval(operation);
         
         // we're done
