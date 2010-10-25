@@ -138,7 +138,28 @@ size_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
         *dest = *source + op2;
         cycles += kADDCycles;
         break;
-        
+       
+	case kSUB:
+        arithmetic = true;
+        shiftOffset(op2, I);
+        *dest = *source - op2;
+        cycles += kSUBCycles;
+        break;
+
+	case kMOD:
+        arithmetic = true;
+        shiftOffset(op2, I);
+        *dest = *source % op2;
+        cycles += kMODCycles;
+        break;
+
+	case kDIV:
+        arithmetic = true;
+        shiftOffset(op2, I);
+        *dest = *source / op2;
+        cycles += kDIVCycles;
+        break;
+
         case kMOV:
         arithmetic = false;
         shiftOffset(op2, I);
@@ -152,7 +173,28 @@ size_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
         *dest = *source & op2;
         cycles += kANDCycles;
         break;
-        
+       
+	case kORR:
+        arithmetic = true;
+        shiftOffset(op2, I);
+        *dest = *source | op2;
+        cycles += kORRCycles;
+        break;
+ 
+	case kXOR:
+        arithmetic = true;
+        shiftOffset(op2, I);
+        *dest = *source ^ op2;
+        cycles += kXORCycles;
+        break;
+
+	case kNOT:
+        arithmetic = true;
+        shiftOffset(op2, I);
+        *dest = *source ~ op2;
+        cycles += kNOTCycles;
+        break;
+
         case kNOP:
         default:
         return (kNOPCycles);
