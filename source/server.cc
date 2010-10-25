@@ -21,7 +21,6 @@ MonitorServer::MonitorServer()
 MonitorServer::~MonitorServer()
 {
     printf("Waiting for listener thread to terminate... ");
-    // The following is a hack!
     vm->terminate = true;
     pthread_join(_listener, NULL);
     printf("Done.\n");

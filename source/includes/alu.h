@@ -32,7 +32,8 @@ enum DataProcessingOpCodes {
 enum DataProcessingTimings {
     kADDCycles          = 1,
     kANDCycles          = 1,
-    kNOPCycles          = 0
+    kNOPCycles          = 0,
+    kMOVCycles          = 1
 };
 
 // Forward class definitions

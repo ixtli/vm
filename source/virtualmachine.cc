@@ -23,7 +23,7 @@ bool VirtualMachine::evaluateConditional()
     // Evaluate the condition code in the IR
     // Get the most significant nybble of the instruction by masking
     reg_t cond = 0xF0000000;
-    cond = _ir && cond;
+    cond = _ir & cond;
     
     // Shift the MSN into the LSN 
     cond = cond >> 28;
@@ -242,6 +242,7 @@ bool VirtualMachine::init(  const char *mem_in, const char *mem_out,
         return (true);
     
     printf("Initializing virtual machine...\n");
+    printf("Registers size: %lu bytes.\n", kRegSize);
     
     // Start up ALU
     alu = new ALU(this);
@@ -268,17 +269,22 @@ bool VirtualMachine::init(  const char *mem_in, const char *mem_out,
     // Set up a sane operating environment
     
     // Start the program at the byte after the end of the interrupt functions
-    _pc = 0x0;
-    _pc += _int_table_size + _int_function_size;
+    _pc = _int_table_size + _int_function_size;
     
     // Advance pc to allocate stack space
     _ss = _pc;
-    _pc += kDefaultStackSpace;
+    _pc += kDefaultStackSpace << 2;
+    printf("%u words of stack allocated at %#x\n", kDefaultStackSpace, _ss);
+    
+    // The code segment starts after the stack segment
+    _cs = _pc;
+    printf("Code segment begins at %#x\n", _cs);
     
     // Load memory image at PC.
-    size_t code_seg_size = mmu->loadFile(mem_in, _pc);
-    _cs = _pc;
-    _ds = _pc + code_seg_size;
+    _ds = _pc;
+    _ds += mmu->loadFile(mem_in, _cs, true);
+    _ds++;
+    printf("Data segment begins at %#x\n", _ds);
     
     // Set up PSR
     _psr = kPSRDefault;
@@ -359,12 +365,23 @@ void VirtualMachine::eval(char *op)
 
 void VirtualMachine::run()
 {
-    printf("Running...\n");
+    printf("Starting execution at %#x\n", _pc);
     while (fex)
     {
         // Fetch PC instruction into IR and increment the pc
-        _cycle_count += mmu->readWord(++_pc, _ir);
-
+        _cycle_count += mmu->readWord(_pc, _ir);
+        printf("PC: %#X\t\t\t%#X\n", _pc, _ir);
+        _pc += kRegSize;
+        
+        // FOR NOW:
+        if (_pc > (0x50 + _cs))
+        {
+            fprintf(stderr, "CPU TRAP: Program unlikely to be this long.\n");
+            _ir = 0xEF000000;
+            execute();
+            continue;
+        }
+        
         // If the cond code precludes execution of the op, don't bother
         if (!evaluateConditional())
             continue;
@@ -372,12 +389,13 @@ void VirtualMachine::run()
         // Do the op
         _cycle_count += execute();
     }
+    
     while (!terminate)
     {
         // Wait for something to happen
         pthread_mutex_lock(&waiting);
         if (terminate)
-            return;
+            continue;
         
         // If we get here, we have a job to do
         eval(operation);
@@ -385,6 +403,8 @@ void VirtualMachine::run()
         // we're done
         pthread_mutex_unlock(&waiting);
     }
+    
+    printf("Exiting...\n");
 }
 
 void VirtualMachine::installJumpTable(reg_t *data, size_t size)

@@ -36,12 +36,12 @@ public:
     
     bool init();
     
-    size_t loadFile(const char *path, size_t to);
+    size_t loadFile(const char *path, size_t to, bool writeBreak);
     bool writeOut(const char *path);
     
     // Operational: must return the timing
     size_t singleTransfer(const STFlags *f);
-    size_t write(size_t addr, unsigned int valueToSave);
+    size_t write(size_t addr, reg_t valueToSave);
     size_t writeBlock(size_t addr, reg_t *data, size_t size);
     size_t readWord(size_t addr, unsigned int &valueToRet);
     size_t readByte(size_t addr, char &valueToRet);

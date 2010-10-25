@@ -5,6 +5,8 @@
 #include "includes/mmu.h"
 #include "includes/virtualmachine.h"
 
+#define BREAK_INTERRUPT     0xEF000000
+
 MMU::MMU(VirtualMachine *vm, size_t size, size_t rtime, size_t wtime) : 
     _vm(vm), _memory_size(size), _read_time(rtime), _write_time(wtime)
 {}
@@ -39,7 +41,7 @@ bool MMU::init()
     return (false);
 }
 
-size_t MMU::loadFile(const char *path, size_t to)
+size_t MMU::loadFile(const char *path, size_t to, bool writeBreak)
 {
     char buffer[256];
     std::ifstream myfile(path);
@@ -57,13 +59,18 @@ size_t MMU::loadFile(const char *path, size_t to)
     while (myfile.good() && i+1 < _memory_size )
     {
         myfile.getline(buffer, 255);
-        _memory[++i] = atoi(buffer);
+        // 'to' is a byte address into memory, make sure to divide by 4
+        // because we're reading from an array of word-sized values
+        _memory[(to >> 2) + (++i)] = (reg_t) atoi(buffer);
     }
     
     myfile.close();
     printf("Done.\n");
     
-    return (i);
+    if (writeBreak)
+        _memory[(to >> 2) + i] = BREAK_INTERRUPT;
+    
+    return (i * kRegSize);
 }
 
 bool MMU::writeOut(const char *path)
@@ -85,12 +92,14 @@ bool MMU::writeOut(const char *path)
     return (false);
 }
 
-size_t MMU::write(size_t addr, unsigned int valueToSave)
+size_t MMU::write(size_t addr, reg_t valueToSave)
 {
     if (addr >= _memory_size)
         return 0;
     
-    _memory[addr] = valueToSave;
+    // Addr is a byte address, but we need to read word aligned
+    // so make sure to divide by 4
+    _memory[addr >> 2] = valueToSave;
 
     return (_write_time);
 }
@@ -100,18 +109,22 @@ size_t MMU::writeBlock(size_t addr, reg_t *data, size_t size)
     if ((addr + size * kRegSize) >= _memory_size)
         return 0;
     
+    // Addr is a byte address, but we need to read word aligned
+    // so make sure to divide by 4
     for (int i = 0; i < size; i++)
-        _memory[i+addr] = data[i];
+        _memory[i+(addr >> 2)] = data[i];
     
     return (_write_time);
 }
 
 size_t MMU::readWord(size_t addr, reg_t &valueToRet)
 {
-    if ((addr * kRegSize) >= _memory_size)
+    if ((addr + kRegSize) > _memory_size)
         return 0;
     
-    valueToRet = _memory[addr];
+    // Addr is a byte address, but we need to read word aligned
+    // so make sure to divide by 4
+    valueToRet = _memory[addr >> 2];
 
     return (_read_time);
 }
@@ -130,26 +143,24 @@ size_t MMU::readRange(size_t start, size_t end, bool hex, char **ret)
 { 
     // Whats the max value?
     int length = 25;
-        
     size_t words = end - start;
     size_t max_size = words + (words*length) + 1;
-   
+    
     //char range[size];
     *ret = (char*)malloc(sizeof(char) * max_size);
     char *val = *ret;
     
     char single[length+2];
     size_t range_index = 0;
-
+    
     for(int i = 0; start+i <= end; i++)
     {
         if (!hex)
-            sprintf(single, "%#x\t- %d\n",  (unsigned int)start+i, _memory[start+i]);
+            sprintf(single, "%#x\t- %d\n",  (reg_t)start+i << 2, _memory[start+i]);
         else
-            sprintf(single, "%#x\t- %#x\n",  (unsigned int)start+i, _memory[start+i]);
+            sprintf(single, "%#x\t- %#x\n",  (reg_t)start+i << 2, _memory[start+i]);
         
         strncpy(&val[range_index], single, strlen(single));
-        
         range_index += strlen(single);
     }
     val[range_index] = '\0';

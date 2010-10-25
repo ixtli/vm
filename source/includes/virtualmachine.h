@@ -11,8 +11,10 @@
 #define kRangeCommand   "RANGE"
 
 // Memory constants, in bytes
-#define kDefaultStackSpace 256
 #define kMinimumMemorySize 524288 
+
+// Stack space, in words
+#define kDefaultStackSpace 5
 
 enum VMSizeMasks {
     kZero               = 0x0,

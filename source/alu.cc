@@ -139,6 +139,13 @@ size_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
         cycles += kADDCycles;
         break;
         
+        case kMOV:
+        arithmetic = false;
+        shiftOffset(op2, I);
+        *dest = op2;
+        cycles += kMOVCycles;
+        break;
+        
         case kAND:
         arithmetic = false;
         shiftOffset(op2, I);
