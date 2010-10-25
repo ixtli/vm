@@ -175,21 +175,21 @@ size_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
         break;
        
 	case kORR:
-        arithmetic = true;
+        arithmetic = false;
         shiftOffset(op2, I);
         *dest = *source | op2;
         cycles += kORRCycles;
         break;
  
 	case kXOR:
-        arithmetic = true;
+        arithmetic = false;
         shiftOffset(op2, I);
         *dest = *source ^ op2;
         cycles += kXORCycles;
         break;
 
 	case kNOT:
-        arithmetic = true;
+        arithmetic = false;
         shiftOffset(op2, I);
         *dest = *source ~ op2;
         cycles += kNOTCycles;
