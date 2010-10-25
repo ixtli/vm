@@ -238,17 +238,18 @@ size_t MMU::singleTransfer(const STFlags *f)
         }
     } else {
         // Reading a whole word!
-        if (computed_source + 1 >= _memory_size)
+        if (computed_source + 4 >= _memory_size)
         {
             abort(computed_source);
             return (kMMUAbortCycles);
         }
         if (f->L)
             // Load the word
-            *dest = _memory[computed_source];
+            *dest = *(_memory + computed_source);
         else
             // Store the word
-            _memory[computed_source] = *dest;
+            // Remember that this is a word 
+            *(_memory + computed_source) = *dest;
     }
     
     if (!f->P)

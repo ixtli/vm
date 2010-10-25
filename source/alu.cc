@@ -176,22 +176,25 @@ size_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
         if (*dest & kMSBMask)
         {
             if (!(*source & kMSBMask))
-                vm->_psr |= kPSRVBit;
+                V_SET;
+            else
+                V_CLEAR;
             
             // Also, set the negative bit
-            vm->_psr |= kPSRNBit;
+            N_SET;
         } else {
             
             // Z flag set if dest is zero
             if (*dest == 0x0) {
-                vm->_psr |= kPSRZBit;
+                Z_SET;
             } else {
                 // As long as we're not zero, we might be super large
-                // The C flag is the carry out of bit 31
                 if (*dest < *source)
-                {
-                    vm->_psr |= kPSRCBit;
-                }
+                    C_SET;
+                else
+                    C_CLEAR;
+                
+                Z_CLEAR;
             }
         }
         
@@ -201,11 +204,15 @@ size_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
         
         // Z flag is set if result is all zeros
         if (*dest == 0x0)
-            vm->_psr |= kPSRZBit;
+            Z_SET;
+        else
+            Z_CLEAR;
         
         // N flag is set to the logical value of bit 31 of the result
         if (*dest & kMSBMask)
-            vm->_psr |= kPSRNBit;
+            N_SET;
+        else
+            N_CLEAR;
         
         // (V Flag is uneffected by logical operations)
     }
