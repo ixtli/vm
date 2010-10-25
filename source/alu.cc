@@ -47,7 +47,7 @@ void ALU::shiftOffset(reg_t &offset, bool immediate)
         
         // Apparently most compilers will recognize the following idiom
         // and compile it into a single ROL operation 
-        imm = (imm >> ror) | (imm << (kRegSize - ror));
+        imm = (imm >> ror) | (imm << (32 - ror));
         
         // Store the value
         offset = imm;
