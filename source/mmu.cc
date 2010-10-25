@@ -28,7 +28,7 @@ bool MMU::init()
     
     // Allocate real memory from system and zero its
     printf("Allocating and zeroing memory... ");
-    _memory = (unsigned int *)calloc(_memory_size, sizeof(char));
+    _memory = (reg_t *)calloc(_memory_size, sizeof(char));
     // Test to make sure memory was allocated
     if (!_memory)
     {
@@ -47,6 +47,12 @@ size_t MMU::loadFile(const char *path, size_t to, bool writeBreak)
     std::ifstream myfile(path);
     
     int i = 0;
+    
+    if (!path)
+    {
+        printf("No memory image to load.\n");
+        return (i);
+    }
     
     if (to >= _memory_size )
     {
@@ -109,13 +115,13 @@ size_t MMU::write(size_t addr, reg_t valueToSave)
 
 size_t MMU::writeBlock(size_t addr, reg_t *data, size_t size)
 {
-    if ((addr + size * kRegSize) >= _memory_size)
+    if ((addr + size) >= _memory_size)
         return 0;
     
-    // Addr is a byte address, but we need to read word aligned
-    // so make sure to divide by 4
-    for (int i = 0; i < size; i++)
-        _memory[i+(addr >> 2)] = data[i];
+    // addr is a byte address, so we have to divide it by 4 to make a word addr
+    // size is a byte size, so divide by four to get the amount of words
+    for (int i = 0; i < (size >> 2); i++)
+        _memory[(addr >> 2) + i] = data[i];
     
     return (_write_time);
 }
@@ -145,30 +151,23 @@ size_t MMU::readByte(size_t addr, char &valueToRet)
 size_t MMU::readRange(size_t start, size_t end, bool hex, char **ret)
 { 
     // Whats the max value?
-    int length = 25;
-    size_t words = end - start;
-    size_t max_size = words + (words*length) + 1;
+    int length = 25; // 10 + 10 + \n + \0 + \t + - + ' '
+    char temp[length];
+    size_t count = end - start;
+    size_t last = 0;
+    *ret = (char *) malloc (sizeof(char) * count * length);
     
-    //char range[size];
-    *ret = (char*)malloc(sizeof(char) * max_size);
-    char *val = *ret;
-    
-    char single[length+2];
-    size_t range_index = 0;
-    
-    for(int i = 0; start+i <= end; i++)
+    for (int i = 0; start + i <= end; i++)
     {
         if (!hex)
-            sprintf(single, "%#x\t- %d\n",  (reg_t)start+i << 2, _memory[start+i]);
-        else
-            sprintf(single, "%#x\t- %#x\n",  (reg_t)start+i << 2, _memory[start+i]);
-        
-        strncpy(&val[range_index], single, strlen(single));
-        range_index += strlen(single);
+        {
+            sprintf(temp, "%#x\t- %d\n", (reg_t)start+i<<2, _memory[start+i]);
+        } else {
+            sprintf(temp, "%#x\t- %#x\n", (reg_t)start+i<<2, _memory[start+i]);            
+        }
+        strcpy(&(*ret)[last], temp);
+        last += strlen(temp);
     }
-    val[range_index] = '\0';
-    
-    return (_read_time * words);
 }
 
 reg_t MMU::shiftOffset(reg_t shift, reg_t *source)
