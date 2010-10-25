@@ -137,7 +137,7 @@ size_t VirtualMachine::execute()
     
     // Parse the Operation Code
     // Test to see if it has a 0 in the first place of the opcode
-    if (_ir & 0x08000000 == 0x0)
+    if ((_ir & 0x08000000) == 0x0)
     {
         // We're either a data processing or single transfer operation
         // Test to see if there is a 1 in the second place of the opcode
