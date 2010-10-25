@@ -31,14 +31,14 @@ enum DataProcessingOpCodes {
 
 enum DataProcessingTimings {
     kADDCycles          = 1,
-    kSUBCycles		= 1,
-    kMODCycles		= 1,
-    kMULCycles		= 1,
-    kDIVCycles		= 1,
+    kSUBCycles          = 1,
+    kMODCycles          = 1,
+    kMULCycles          = 1,
+    kDIVCycles          = 1,
     kANDCycles          = 1,
-    kORRCycles		= 1,
-    kNOTCycles		= 1,
-    kXORCycles		= 1,
+    kORRCycles          = 1,
+    kNOTCycles          = 1,
+    kXORCycles          = 1,
     kNOPCycles          = 0,
     kMOVCycles          = 1
 };
@@ -56,6 +56,9 @@ public:
     
     // Operational: must return the timing
     size_t dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2);
+    
+    // Access to the barrel shifter.
+    static bool shift(reg_t &offset, reg_t val, reg_t shift, reg_t op);
     
 private:
     void shiftOffset(reg_t &offset, bool immediate);

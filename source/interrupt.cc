@@ -6,9 +6,8 @@
 
 reg_t jump_table[] = {      0x0, sizeof(reg_t)          };
 reg_t functions[] = {       kBREAK_INSTRUCTION          ,
-                            kRETURN_INSTRUCTION         ,
-                            0xEF00000F                  ,
-                            0xEF00000F                  };
+                            kRETURN_INSTRUCTION
+                                                        };
 
 InterruptController::InterruptController(VirtualMachine *vm) : _vm(vm)
 {}

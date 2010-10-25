@@ -28,6 +28,57 @@ bool ALU::init()
     return (false);
 }
 
+bool ALU::shift(reg_t &offset, reg_t val, reg_t shift, reg_t op)
+{
+    reg_t mask;
+    
+    switch (op)
+    {
+        case kShiftLSL:
+        offset = (val << shift);
+        // Least significant discarded bit becomes the carry-out
+        mask = kOne << (kRegSize - shift - 2);
+        if (val & mask)
+            return (true);
+        return (false);
+    
+        case kShiftASR:
+        offset = (val >> shift);
+        // Sign extend by filling in vacant bits with original sign bit
+        // Get a mask of the now-empty bits
+        mask = kWordMask << (kRegSize - shift);
+        
+        // If there was a sign bit, make all empty bits 1
+        // otherwise leave it as zeros
+        if (val & kSignBitMask)
+            offset |= mask;
+        
+        // Then use the MSB of the discarded portion as the carry
+        mask = kOne << (shift - 1);
+        if (val & mask)
+            return (true);
+        return (false);
+    
+        case kShiftLSR:
+        // Same thing as LSL, but check the MSB of the discarded portion
+        offset = (val >> shift);
+        mask = kOne << (shift - 1);
+        if (val & mask)
+            return (true);
+        return (false);
+        
+        case kShiftROR:
+        default:
+        // Do a normal rotate right
+        offset = (val >> shift) | (val >> (kRegSize - shift));
+        // However, selection for the carry bit is the same as in LSR
+        mask = kOne << (shift - 1);
+        if (val & mask)
+            return (true);
+        return (false);
+    }
+}
+
 void ALU::shiftOffset(reg_t &offset, bool immediate)
 {
     // Perform the somewhat complex operation of barrel shifting the offset
@@ -58,7 +109,6 @@ void ALU::shiftOffset(reg_t &offset, bool immediate)
         reg_t operation = (offset & kShiftOpMask) >> 5;
         reg_t *value = vm->selectRegister(offset & kShiftRmMask);
         reg_t *shift = vm->selectRegister((offset & kShiftRsMask) >> 7);
-        reg_t mask;
         
         // Shifting zero is a special case where you dont touch the C bit
         if (*shift == 0)
@@ -66,52 +116,8 @@ void ALU::shiftOffset(reg_t &offset, bool immediate)
             offset = *value;
             return;
         }
-    
-        switch (operation)
-        {
-            case kShiftLSL:
-            offset = (*value << *shift);
-            // Least significant discarded bit becomes the carry-out
-            mask = kOne << (kRegSize - *shift - 2);
-            if (*value & mask)
-                carry_bit = true;
-            break;
         
-            case kShiftASR:
-            offset = (*value >> *shift);
-            // Sign extend by filling in vacant bits with original sign bit
-            // Get a mask of the now-empty bits
-            mask = kWordMask << (kRegSize - *shift);
-            
-            // If there was a sign bit, make all empty bits 1
-            // otherwise leave it as zeros
-            if (*value & kSignBitMask)
-                offset |= mask;
-            
-            // Then use the MSB of the discarded portion as the carry
-            mask = kOne << (*shift - 1);
-            if (*value & mask)
-                carry_bit = true;
-            break;
-        
-            case kShiftLSR:
-            // Same thing as LSL, but check the MSB of the discarded portion
-            offset = (*value >> *shift);
-            mask = kOne << (*shift - 1);
-            if (*value & mask)
-                carry_bit = true;
-            break;
-            
-            case kShiftROR:
-            default:
-            // Do a normal rotate right
-            offset = (*value >> *shift) | (*value >> (kRegSize - *shift));
-            // However, selection for the carry bit is the same as in LSR
-            mask = kOne << (*shift - 1);
-            if (*value & mask)
-                carry_bit = true;
-            break;
-        }
+        carry_bit = ALU::shift(offset, *value, *shift, operation);
     }
     
     if (carry_bit)

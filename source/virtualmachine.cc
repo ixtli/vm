@@ -283,7 +283,8 @@ bool VirtualMachine::init(  const char *mem_in, const char *mem_out,
     // Load memory image at PC.
     _ds = _pc;
     _ds += mmu->loadFile(mem_in, _cs, true);
-    _ds++;
+    // Advance one byte further to begin the data segment
+    _ds += kRegSize;
     printf("Data segment begins at %#x\n", _ds);
     
     // Set up PSR
@@ -335,7 +336,7 @@ void VirtualMachine::eval(char *op)
         mmu->readWord(addr, val);
     
         response = (char *)malloc(sizeof(char) * 512);
-        sprintf(response, "%#x - %i\n", addr, val);
+        sprintf(response, "%#x - %#x\n", addr, val);
         respsize = strlen(response);
         return;
     } else if (strcmp(pch, kRangeCommand) == 0) {

@@ -4,6 +4,7 @@
 
 #include "includes/mmu.h"
 #include "includes/virtualmachine.h"
+#include "includes/alu.h"
 
 #define BREAK_INTERRUPT     0xEF000000
 
@@ -51,6 +52,11 @@ size_t MMU::loadFile(const char *path, size_t to, bool writeBreak)
     if (!path)
     {
         printf("No memory image to load.\n");
+        if (writeBreak)
+        {
+            _memory[(to >> 2)] = BREAK_INTERRUPT;
+            i = 1;
+        }
         return (i);
     }
     
@@ -70,7 +76,7 @@ size_t MMU::loadFile(const char *path, size_t to, bool writeBreak)
         _memory[(to >> 2) + (i++)] = (reg_t) atoi(buffer);
     }
     
-    // adjust i for the cycle that never happened
+    // This last increment never really happened
     i--;
     
     myfile.close();
@@ -78,6 +84,8 @@ size_t MMU::loadFile(const char *path, size_t to, bool writeBreak)
     
     if (writeBreak)
         _memory[(to >> 2) + i] = BREAK_INTERRUPT;
+    else
+        i--;
     
     return (i * kRegSize);
 }
@@ -170,11 +178,6 @@ size_t MMU::readRange(size_t start, size_t end, bool hex, char **ret)
     }
 }
 
-reg_t MMU::shiftOffset(reg_t shift, reg_t *source)
-{
-    
-}
-
 void MMU::abort(reg_t &location)
 {
     fprintf(stderr, "MMU ABORT: Read error %#x.\n", location);
@@ -194,11 +197,16 @@ size_t MMU::singleTransfer(const STFlags *f)
     // Immediate means that the offset is composed of
     if (f->I == true)
     {
-        // An offset register
-        reg_t *offset_reg = vm->selectRegister(offset & kSTORegisterMask);
-        // And a 5-bit value to shift that register by
-        offset = shiftOffset((offset & kSTOShiftValMask) >> 5, offset_reg);
-        // (Rather odd here that Immediate == True means it's not immediate ...)
+        // Use the ALU barrel shifter here
+        reg_t operation = (offset & kShiftOpMask) >> 5;
+        reg_t *value = vm->selectRegister(offset & kShiftRmMask);
+        reg_t *shift = vm->selectRegister((offset & kShiftRsMask) >> 7);
+        
+        // N.B. That this differs from the ARM7500 that we've modeled
+        // the rest of this machine on, since you are required to specify
+        // a fourth register that tells you how much to shift the shift
+        // value by.
+        ALU::shift(offset, *value, *shift, operation);
     }
     
     if (f->P)
@@ -244,11 +252,11 @@ size_t MMU::singleTransfer(const STFlags *f)
         }
         if (f->L)
             // Load the word
-            *dest = *(_memory + computed_source);
+            *dest = *(((char *)_memory) + computed_source);
         else
             // Store the word
             // Remember that this is a word 
-            *(_memory + computed_source) = *dest;
+            *(((char *)_memory) + computed_source) = *dest;
     }
     
     if (!f->P)

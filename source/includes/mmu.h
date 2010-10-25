@@ -48,7 +48,6 @@ public:
     size_t readRange(size_t start, size_t end, bool hex, char **ret);
 
 private:
-    reg_t shiftOffset(reg_t shift, reg_t *source);
     void abort(reg_t &location);
     
     VirtualMachine *_vm;
