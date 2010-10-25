@@ -61,8 +61,11 @@ size_t MMU::loadFile(const char *path, size_t to, bool writeBreak)
         myfile.getline(buffer, 255);
         // 'to' is a byte address into memory, make sure to divide by 4
         // because we're reading from an array of word-sized values
-        _memory[(to >> 2) + (++i)] = (reg_t) atoi(buffer);
+        _memory[(to >> 2) + (i++)] = (reg_t) atoi(buffer);
     }
+    
+    // adjust i for the cycle that never happened
+    i--;
     
     myfile.close();
     printf("Done.\n");

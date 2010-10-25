@@ -298,69 +298,94 @@ bool VirtualMachine::init(  const char *mem_in, const char *mem_out,
 
 void VirtualMachine::eval(char *op)
 {
+    // We need to parse arguments
     char *pch = strtok(op, " ");
-    if (pch != NULL)
+    if (strcmp(pch, kWriteCommand) == 0)
     {
-        if (strcmp(pch, kWriteCommand) == 0)
-        {
-            int addr, val;
-            pch = strtok(NULL, " ");
-            if (pch)
-                addr = atoi(pch);
-            else
-                addr = 0;
-        
-            pch = strtok(NULL, " ");
-            if (pch)
-                val = atoi(pch);
-            else
-                val = 0;
-        
-            mmu->write(addr, val);
-        
-            response = (char *)malloc(sizeof(char) * 512);
-            sprintf(response, "Value '%i' written to '%#x'.\n",
-                val, addr);
-            respsize = strlen(response);
-        } else if (strcmp(pch, kReadCommand) == 0) {
-            // read
-            int addr;
-            reg_t val;
-            pch = strtok(NULL, " ");
-            if (pch)
-                addr = atoi(pch);
-            else
-                addr = 0;
-        
-            mmu->readWord(addr, val);
-        
-            response = (char *)malloc(sizeof(char) * 512);
-            sprintf(response, "%#x - %i\n", addr, val);
-            respsize = strlen(response);
-        } else if (strcmp(pch, kRangeCommand) == 0) {
-            // range
-            int addr, val;
-            pch = strtok(NULL, " ");
-            if (pch)
-                addr = atoi(pch);
-            else
-                addr = 0;
-        
-            pch = strtok(NULL, " ");
-            if (pch)
-                val = atoi(pch);
-            else
-                val = 0;
-        
-            char *temp;
-            mmu->readRange(addr, val, true, &temp);
-            response = temp;
-            respsize = strlen(response);
-        } else {
-            // unknown command
-            respsize = 0;
-        }
+        int addr, val;
+        pch = strtok(NULL, " ");
+        if (pch)
+            addr = atoi(pch);
+        else
+            addr = 0;
+    
+        pch = strtok(NULL, " ");
+        if (pch)
+            val = atoi(pch);
+        else
+            val = 0;
+    
+        mmu->write(addr, val);
+    
+        response = (char *)malloc(sizeof(char) * 512);
+        sprintf(response, "Value '%i' written to '%#x'.\n",
+            val, addr);
+        respsize = strlen(response);
+        return;
+    } else if (strcmp(pch, kReadCommand) == 0) {
+        // read
+        int addr;
+        reg_t val;
+        pch = strtok(NULL, " ");
+        if (pch)
+            addr = atoi(pch);
+        else
+            addr = 0;
+    
+        mmu->readWord(addr, val);
+    
+        response = (char *)malloc(sizeof(char) * 512);
+        sprintf(response, "%#x - %i\n", addr, val);
+        respsize = strlen(response);
+        return;
+    } else if (strcmp(pch, kRangeCommand) == 0) {
+        // range
+        int addr, val;
+        pch = strtok(NULL, " ");
+        if (pch)
+            addr = atoi(pch);
+        else
+            addr = 0;
+    
+        pch = strtok(NULL, " ");
+        if (pch)
+            val = atoi(pch);
+        else
+            val = 0;
+    
+        char *temp;
+        mmu->readRange(addr, val, true, &temp);
+        response = temp;
+        respsize = strlen(response);
+        return;
     }
+    
+    // If nothing worked just send machine status
+    char temp[1024];
+    sprintf(temp, "Machine Status: ");
+    if (supervisor)
+        sprintf(temp+strlen(temp), "Supervisor mode\n");
+    else
+        sprintf(temp+strlen(temp), "User mode\n");
+    sprintf(temp+strlen(temp),  "Program Status Register: %#x\n", _psr);
+    sprintf(temp+strlen(temp),  "Program Counter: %#x\n", _pc);
+    sprintf(temp+strlen(temp),  "Instruction Register: %#x\n", _ir);
+    sprintf(temp+strlen(temp),  "Code segment: %#x\n", _cs);
+    sprintf(temp+strlen(temp),  "Data segment: %#x\n", _ds);
+    sprintf(temp+strlen(temp),  "Stack segment: %#x\n", _ss);
+    sprintf(temp+strlen(temp), "General Purpose Registers:\n");
+    sprintf(temp+strlen(temp),  
+        "r0 - %u\tr1 - %u\tr2 - %u\tr3 - %u\n", _r[0], _r[1], _r[2], _r[3]);
+    sprintf(temp+strlen(temp),  
+        "r4 - %u\tr5 - %u\tr6 - %u\tr7 - %u\n", _r[4], _r[5], _r[6], _r[7]);
+    sprintf(temp+strlen(temp),  
+        "r8 - %u\tr9 - %u\tr10 - %u\tr11 - %u\n", _r[8], _r[9], _r[10], _r[11]);
+    sprintf(temp+strlen(temp),  
+        "r12 - %u\tr13 - %u\tr14 - %u\tr15 - %u\n", _r[12], _r[13], _r[14], _r[15]);
+    
+    response = (char *)malloc(sizeof(char) * strlen(temp) + 1);
+    strcpy(response, temp);
+    respsize = strlen(response);
 }
 
 void VirtualMachine::run()
