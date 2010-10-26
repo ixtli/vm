@@ -132,75 +132,112 @@ size_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
 {
     size_t cycles = 0;
     bool shift_carry = false;
-    bool arithmetic = false;
-    reg_t *dest = vm->selectRegister(d);
+    bool arithmetic = true;
+    bool commit = true;
+    reg_t dest;
     reg_t *source = vm->selectRegister(s);
     
     switch (op)
     {
         case kADD:
-        arithmetic = true;
         shiftOffset(op2, I);
-        *dest = *source + op2;
+        dest = *source + op2;
         cycles += kADDCycles;
         break;
        
-	case kSUB:
+        case kSUB:
         arithmetic = true;
         shiftOffset(op2, I);
-        *dest = *source - op2;
+        dest = *source - op2;
         cycles += kSUBCycles;
         break;
 
-	case kMOD:
-        arithmetic = true;
+        case kMOD:
         shiftOffset(op2, I);
-        *dest = *source % op2;
+        dest = *source % op2;
         cycles += kMODCycles;
         break;
 
-	case kDIV:
-        arithmetic = true;
+        case kDIV:
         shiftOffset(op2, I);
-        *dest = *source / op2;
+        dest = *source / op2;
         cycles += kDIVCycles;
         break;
 
         case kMOV:
         arithmetic = false;
         shiftOffset(op2, I);
-        *dest = op2;
+        dest = op2;
         cycles += kMOVCycles;
         break;
         
         case kAND:
         arithmetic = false;
         shiftOffset(op2, I);
-        *dest = *source & op2;
+        dest = *source & op2;
         cycles += kANDCycles;
         break;
        
-	case kORR:
+        case kORR:
         arithmetic = false;
         shiftOffset(op2, I);
-        *dest = *source | op2;
+        dest = *source | op2;
         cycles += kORRCycles;
         break;
  
-	case kXOR:
+        case kXOR:
         arithmetic = false;
         shiftOffset(op2, I);
-        *dest = *source ^ op2;
+        dest = *source ^ op2;
         cycles += kXORCycles;
         break;
 
-	case kNOT:
+        case kNOT:
         arithmetic = false;
         shiftOffset(op2, I);
-        *dest = ~(*source);
+        dest = ~(*source);
         cycles += kNOTCycles;
         break;
-
+        
+        case kCMP:
+        arithmetic = false;
+        commit = false;
+        shiftOffset(op2, I);
+        dest = *source - op2;
+        cycles += kCMPCycles;
+        break;
+        
+        case kCMN:
+        arithmetic = false;
+        commit = false;
+        shiftOffset(op2, I);
+        dest = *source + op2;
+        cycles += kCMNCycles;
+        break;
+        
+        case kTST:
+        arithmetic = false;
+        commit = false;
+        shiftOffset(op2, I);
+        dest = *source & op2;
+        cycles += kTSTCycles;
+        break;
+        
+        case kTEQ:
+        arithmetic = false;
+        commit = false;
+        shiftOffset(op2, I);
+        dest = *source ^ op2;
+        cycles += kTEQCycles;
+        break;
+        
+        case kBIC:
+        arithmetic = false;
+        shiftOffset(op2, I);
+        dest = *source & ~op2;
+        cycles += kBICCycles;
+        break;
+        
         case kNOP:
         default:
         return (kNOPCycles);
@@ -221,7 +258,7 @@ size_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
         // Set V if there was an overflow into the 31st bit
         // My understanding of this is that if 31st bit was NOT
         // set in *source, but is in *dest, set V
-        if (*dest & kMSBMask)
+        if (dest & kMSBMask)
         {
             if (!(*source & kMSBMask))
                 V_SET;
@@ -233,11 +270,11 @@ size_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
         } else {
             
             // Z flag set if dest is zero
-            if (*dest == 0x0) {
+            if (dest == 0x0) {
                 Z_SET;
             } else {
                 // As long as we're not zero, we might be super large
-                if (*dest < *source)
+                if (dest < *source)
                     C_SET;
                 else
                     C_CLEAR;
@@ -251,19 +288,23 @@ size_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
         // C flag is set to the carry out of the shifter, so do nothing.
         
         // Z flag is set if result is all zeros
-        if (*dest == 0x0)
+        if (dest == 0x0)
             Z_SET;
         else
             Z_CLEAR;
         
         // N flag is set to the logical value of bit 31 of the result
-        if (*dest & kMSBMask)
+        if (dest & kMSBMask)
             N_SET;
         else
             N_CLEAR;
         
         // (V Flag is uneffected by logical operations)
     }
+    
+    if (commit)
+        *(vm->selectRegister(d)) = dest;
+    
     return (cycles);
 }
 

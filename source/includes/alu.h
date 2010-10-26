@@ -40,7 +40,12 @@ enum DataProcessingTimings {
     kNOTCycles          = 1,
     kXORCycles          = 1,
     kNOPCycles          = 0,
-    kMOVCycles          = 1
+    kMOVCycles          = 1,
+    kCMPCycles          = 1,
+    kCMNCycles          = 1,
+    kTSTCycles          = 1,
+    kTEQCycles          = 1,
+    kBICCycles          = 1
 };
 
 // Forward class definitions

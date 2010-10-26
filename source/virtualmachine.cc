@@ -395,7 +395,8 @@ void VirtualMachine::eval(char *op)
     sprintf(temp+strlen(temp),  "Stack segment: %#x\n", _ss);
     sprintf(temp+strlen(temp), "General Purpose Registers:\n");
     sprintf(temp+strlen(temp),  
-        "r0 - %u\tr1 - %u\tr2 - %u\tr3 - %u\n", _r[0], _r[1], _r[2], _r[3]);
+        "r0 - %u\tr1 - %u\tr2 - %u\tr3 - %u\n", _r[0], _r[1], (signed int)_r[2],
+	(signed int)_r[3]);
     sprintf(temp+strlen(temp),  
         "r4 - %u\tr5 - %u\tr6 - %u\tr7 - %u\n", _r[4], _r[5], _r[6], _r[7]);
     sprintf(temp+strlen(temp),  
