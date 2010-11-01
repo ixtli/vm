@@ -40,8 +40,8 @@ size_t FPU::execute(char op, reg_t &fps, reg_t &fpd, reg_t &fpn, reg_t &fpm)
             break;
         case kFSB:
             printf("==============sub\n");
-            cycles += kFSBCycles;
             *_fps = *_fpn - *_fpm;
+            cycles += kFSBCycles;
             break;
         case kFML:
             printf("==============mul\n");
@@ -49,6 +49,7 @@ size_t FPU::execute(char op, reg_t &fps, reg_t &fpd, reg_t &fpn, reg_t &fpm)
             break;
         case kFDV:
             printf("==============div\n");
+            *_fps = *_fpn / *_fpm;
             cycles += kFDVCycles;
             break;
            
