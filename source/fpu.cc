@@ -35,20 +35,25 @@ size_t FPU::execute(char op, reg_t &fps, reg_t &fpd, reg_t &fpn, reg_t &fpm)
     {
         case kFAD:
             printf("==============add\n");
+            arithmetic = true;
             *_fps = *_fpn + *_fpm;
             cycles += kFADCycles;
             break;
         case kFSB:
             printf("==============sub\n");
+            arithmetic = true;
             *_fps = *_fpn - *_fpm;
             cycles += kFSBCycles;
             break;
         case kFML:
             printf("==============mul\n");
+            arithmetic = true;
+            *_fps = *_fpn * *_fpm;
             cycles += kFMLCycles;
             break;
         case kFDV:
             printf("==============div\n");
+            arithmetic = true;
             *_fps = *_fpn / *_fpm;
             cycles += kFDVCycles;
             break;
