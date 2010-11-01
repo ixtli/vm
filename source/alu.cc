@@ -152,6 +152,15 @@ size_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
         cycles += kSUBCycles;
         break;
 
+        case kMUL:
+        arithmetic = true;
+        shiftOffset(op2, I);
+        dest = ((*source) * op2); //store lowest 32 bits on Rd
+        //dest = ((*source) * op2) & 4294967295; //store lowest 32 bits on Rd
+        //pq[0] = (*source * op2) >> 32; //shift 32 bits right, to give highest bits
+        cycles += kMULCycles;
+        break;
+
         case kMOD:
         shiftOffset(op2, I);
         dest = *source % op2;

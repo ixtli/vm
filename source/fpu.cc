@@ -34,13 +34,13 @@ size_t FPU::execute(char op, reg_t &fps, reg_t &fpd, reg_t &fpn, reg_t &fpm)
         case kFAD:
             printf("==============add\n");
             break;
-        case kSUB:
+        case kFSB:
             printf("==============sub\n");
             break;
-        case kMUL:
+        case kFML:
             printf("==============mul\n");
             break;
-        case kDIV:
+        case kFDV:
             printf("==============div\n");
             break;
            
