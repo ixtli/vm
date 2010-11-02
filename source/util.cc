@@ -18,39 +18,38 @@ unsigned int _binary_to_int(const char *str)
 unsigned int _hex_to_int(const char *str)
 {
     unsigned int ret;
-    
+    const char *index = str;
     size_t len = strlen(str);
-    size_t index = 0;
     
     // check to see if they started with '0x'
     if (len > 1)
     {
-        if (str[0] == '0' && str[1] == 'x')
+        if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X'))
         {
             // if so, skip it
-            index = 2;
+            index += 2;
+            len = strlen(index);
         }
     }
     
     // parse
     unsigned int charval = 0;
-    for (int i = 0;index < len; index++)
+    for (int i = 0; i < len; i++)
     {
-        if (str[index] > 47 && str[index] < 58 )
+        if (index[i] > 47 && index[i] < 58 )
         {
             // [0-9]
-            charval = str[index] - 48;
-        } else if (str[index] > 64 && str[index] < 91) {
+            charval = index[i] - 48;
+        } else if (index[i] > 64 && index[i] < 91) {
             // [A-Z]
-            charval = str[index] - 65 + 10;
+            charval = index[i] - 65 + 10;
             
-        } else if (str[index] > 96 && str[index] < 123) {
+        } else if (index[i] > 96 && index[i] < 123) {
             // [a-z]
-            charval = str[index] - 97 + 10;
+            charval = index[i] - 97 + 10;
         }
         // i is our index into the returned number
-        ret |= (charval << (4 * i));
-        i++;
+        ret |= (charval << (4 * (len - i -1)));
     }
     
     return (ret);
