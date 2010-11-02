@@ -140,7 +140,7 @@ for lines in range(0,file_len(sys.argv[1])):
 		else:
 				bin += comp_test[instruction.strip()]; #opcode
 
-		bin += "0"; #s flag
+		bin += "1"; #s flag
 		bin += decimal_to_binary(int(bindest)); #Rd
 		bin += decimal_to_binary(int(binsrc1)); #Rs
 		bin += "00000"; #padding if its not being shifted
