@@ -134,7 +134,6 @@ size_t VirtualMachine::execute()
 {
     // return this to tell how many cycles the op took
     size_t cycles = 0;
-    
     // Parse the Operation Code
     // Test to see if it has a 0 in the first place of the opcode
     if ((_ir & 0x08000000) == 0x0)

@@ -11,6 +11,17 @@ enum FPUInstructionMasks {
     kFPmMask            = 0x00000700
 };
 
+enum FPUProcessingOpCodes {
+    kFAD, kFSB, kFML, kFDV
+};
+
+enum FPUProcessingTimings {
+    kFADCycles          = 1,
+    kFSBCycles          = 1,
+    kFMLCycles          = 1,
+    kFDVCycles          = 1
+}; 
+
 // Forward class definitions
 class VirtualMachine;
 
