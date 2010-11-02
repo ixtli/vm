@@ -5,6 +5,7 @@
 #include "includes/mmu.h"
 #include "includes/virtualmachine.h"
 #include "includes/alu.h"
+#include "includes/util.h"
 
 #define BREAK_INTERRUPT     0xEF000000
 
@@ -73,7 +74,7 @@ size_t MMU::loadFile(const char *path, size_t to, bool writeBreak)
         myfile.getline(buffer, 255);
         // 'to' is a byte address into memory, make sure to divide by 4
         // because we're reading from an array of word-sized values
-        _memory[(to >> 2) + (i++)] = (reg_t) atoi(buffer);
+        _memory[(to >> 2) + (i++)] = _binary_to_int(buffer);
     }
     
     // This last increment never really happened
