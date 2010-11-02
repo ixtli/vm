@@ -144,26 +144,26 @@ size_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
         dest = *source + op2;
         cycles += kADDCycles;
         break;
-       
+        
         case kSUB:
         arithmetic = true;
         shiftOffset(op2, I);
         dest = *source - op2;
         cycles += kSUBCycles;
         break;
-
+        
         case kMOD:
         shiftOffset(op2, I);
         dest = *source % op2;
         cycles += kMODCycles;
         break;
-
+        
         case kDIV:
         shiftOffset(op2, I);
         dest = *source / op2;
         cycles += kDIVCycles;
         break;
-
+        
         case kMOV:
         arithmetic = false;
         shiftOffset(op2, I);
@@ -177,21 +177,21 @@ size_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
         dest = *source & op2;
         cycles += kANDCycles;
         break;
-       
+        
         case kORR:
         arithmetic = false;
         shiftOffset(op2, I);
         dest = *source | op2;
         cycles += kORRCycles;
         break;
- 
+        
         case kXOR:
         arithmetic = false;
         shiftOffset(op2, I);
         dest = *source ^ op2;
         cycles += kXORCycles;
         break;
-
+        
         case kNOT:
         arithmetic = false;
         shiftOffset(op2, I);
@@ -246,60 +246,62 @@ size_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
     // We're done if we're not setting status bits
     // N.B.: Ignore the S bit if dest == PC, so that we dont get status bit
     //       confusion when you branch or something.
-    if (!s || d == kPCCode) return (cycles);
     
     // Reset status bits that are effected
     vm->_psr &= ~NVCZ_MASK;
     
     // Set status bits
     // There are two cases, logical and arithmetic
-    if (arithmetic)
+    if ( !(s || d == kPCCode))
     {
-        // Set V if there was an overflow into the 31st bit
-        // My understanding of this is that if 31st bit was NOT
-        // set in *source, but is in *dest, set V
-        if (dest & kMSBMask)
+        if (arithmetic)
         {
-            if (!(*source & kMSBMask))
-                V_SET;
-            else
-                V_CLEAR;
-            
-            // Also, set the negative bit
-            N_SET;
-        } else {
-            
-            // Z flag set if dest is zero
-            if (dest == 0x0) {
-                Z_SET;
-            } else {
-                // As long as we're not zero, we might be super large
-                if (dest < *source)
-                    C_SET;
+            // Set V if there was an overflow into the 31st bit
+            // My understanding of this is that if 31st bit was NOT
+            // set in *source, but is in *dest, set V
+            if (dest & kMSBMask)
+            {
+                if (!(*source & kMSBMask))
+                    V_SET;
                 else
-                    C_CLEAR;
+                    V_CLEAR;
+            
+                // Also, set the negative bit
+                N_SET;
+            } else {
+            
+                // Z flag set if dest is zero
+                if (dest == 0x0) {
+                    Z_SET;
+                } else {
+                    // As long as we're not zero, we might be super large
+                    if (dest < *source)
+                        C_SET;
+                    else
+                        C_CLEAR;
                 
-                Z_CLEAR;
+                    Z_CLEAR;
+                }
             }
+        
+        } else {
+            // We're a logical operation
+            // C flag is set to the carry out of the shifter, so do nothing.
+        
+            // Z flag is set if result is all zeros
+            if (dest == 0x0)
+                Z_SET;
+            else
+                Z_CLEAR;
+        
+            // N flag is set to the logical value of bit 31 of the result
+            if (dest & kMSBMask)
+                N_SET;
+            else
+                N_CLEAR;
+        
+            // (V Flag is uneffected by logical operations)
         }
-        
-    } else {
-        // We're a logical operation
-        // C flag is set to the carry out of the shifter, so do nothing.
-        
-        // Z flag is set if result is all zeros
-        if (dest == 0x0)
-            Z_SET;
-        else
-            Z_CLEAR;
-        
-        // N flag is set to the logical value of bit 31 of the result
-        if (dest & kMSBMask)
-            N_SET;
-        else
-            N_CLEAR;
-        
-        // (V Flag is uneffected by logical operations)
     }
     
     if (commit)

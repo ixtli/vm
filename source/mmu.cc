@@ -252,7 +252,7 @@ size_t MMU::singleTransfer(const STFlags *f)
         }
         if (f->L)
             // Load the word
-            *dest = *(((char *)_memory) + computed_source);
+            *dest = (unsigned int) *(((char *)_memory) + computed_source);
         else
             // Store the word
             // Remember that this is a word 
