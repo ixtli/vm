@@ -21,15 +21,15 @@ class Assembler:
     label = {};
     
     #the mnemonics of all arithmetic and logic instructions
-    arithmetic_logic = {"ADD" : "0000", "SUB" : "0001", "MOD" : "0010", "MUL" : "0011",
-    "DIV" : "0100", "AND" : "0101", "ORR" : "0110", "NOT" : "0111" ,"XOR" :
+    arithmetic_logic = {"add" : "0000", "sub" : "0001", "mod" : "0010", "mul" : "0011",
+    "div" : "0100", "and" : "0101", "orr" : "0110", "not" : "0111" ,"xor" :
     "1000"}
     
     #mnemonics for comparing and testing
-    comp_test = {"CMP" : "1001", "CMN" : "1010", "TST": "1011", "TEQ" : "1100", "MOV" :
-    "1101", "BIC" : "1110", "NOP" : "1111"}
+    comp_test = {"cmp" : "1001", "cmn" : "1010", "tst": "1011", "teq" : "1100", "mov" :
+    "1101", "bic" : "1110", "nop" : "1111"}
     
-    branch = {"BRH" : "1010", "BRL" : "1011"};
+    branch = {"brh" : "1010", "brl" : "1011"};
     
     # Member function definitions
     def __init__(self):
@@ -145,7 +145,7 @@ class Assembler:
                         i += 1;
                 # we use 0's if the instruction is MOV, the register is unused
                 else:
-                    #n eeds 2 places because src[0] is assumed to be R usually
+                    # needs 2 places because src[0] is assumed to be R usually
                     src1 = "00"; 
                 # get the second source register
                 # go past the comma and space
@@ -156,8 +156,8 @@ class Assembler:
                     i += 1;
                 src2 += (line[i]);
                 
-                #check if there is an R, which stands for register or if it
-                if (src2[0] == "R"): 
+                # check if there is an r (register), or if its immediate
+                if (src2[0] == "r"): 
                     immediate = 0;
                 else:
                     immediate = 1;
@@ -190,8 +190,8 @@ class Assembler:
                 
                 # s flag
                 bin += "1";
-                bin += self.decimal_to_binary(int(bindest)); # Rd
                 bin += self.decimal_to_binary(int(binsrc1)); # Rs
+                bin += self.decimal_to_binary(int(bindest)); # Rd
                 # padding if its not being shifted
                 bin += "00000";
                 
