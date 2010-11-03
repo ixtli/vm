@@ -25,7 +25,7 @@ enum MOVOpShiftMasks {
     kMOVShiftLiteral    = 0x000001F8,
     kMOVShiftType       = 0x00000003,
     kMOVShiftOp         = 0x00000004
-}
+};
 
 enum ShiftOperations {
     kShiftLSL, kShiftLSR, kShiftASR, kShiftROR
