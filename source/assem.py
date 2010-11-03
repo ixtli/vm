@@ -33,7 +33,12 @@ class Assembler:
     
     # Member function definitions
     def __init__(self):
-        a = 5;
+        
+        """
+        Initialize the class by parsing command line ops
+        """
+        
+        
     
     def file_len(self, fname):
         
@@ -46,7 +51,7 @@ class Assembler:
                                     pass;
         return i + 1;
     
-    def decimal_to_binary(self, int):
+    def decimal_to_binary(self, val):
         
         """
         Borrowed from some website.  We'll be sure to give it back
@@ -61,7 +66,7 @@ class Assembler:
         # for each bit
         for i in range(1,33):
             # if the bit is set, print 1
-            if( int & const ):
+            if( val & const ):
                 output = output + "1"
             else:
                 output = output + "0"
@@ -69,7 +74,7 @@ class Assembler:
             const = const >> 1
         # remove bit padding infront	
         for i in range(0, len(output)):
-            if (output[i] == "1") | (moveon == 1):
+            if (output[i] == "1") or (moveon == 1):
                 smalloutput += output[i];
                 moveon = 1;
             else:
@@ -88,6 +93,11 @@ class Assembler:
             return smalloutput;
     
     def assemble(self):
+        
+        """
+        Assemble the file
+        """
+        
         instruction_index = 0;
         
         #loop through all lines of the file one by one
@@ -98,7 +108,7 @@ class Assembler:
             
             i = 0;
             immediate = 0;
-            instruction = "";           #the operation (ADD, SUB, AND, OR, MOV, etc)
+            instruction = "";           #the operation (ADD, SUB, AND, ...)
             dest = "";                  #destination reg
             src1  = "";                 #first source register
             src2 = "";                  #second source register, Op2
@@ -106,19 +116,22 @@ class Assembler:
             bin = cond_code;
             
             # get the operation mnemonic (ADD, SUB, MOD, AND, etc)
-            while (line[i] != " ") & (i < len(line)-1) & (line[i] != "\n"):
+            while (line[i] != " ") and (i < len(line)-1) and (line[i] != "\n"):
                 instruction += (line[i]);
                 i += 1;
             instruction += line[i];
             
             # check if its an arithmetic/logic/compare/test instruction
-            if (instruction.strip() in self.arithmetic_logic) | (instruction.strip() in self.comp_test): 
+            if (instruction.strip() in self.arithmetic_logic) or \
+                (instruction.strip() in self.comp_test): 
                 # bin += arithmetic_logic[instruction.strip()];
                 # print bin;
                 i += 1;
                 
                 # get the destination register
-                while ((i < len(line)-1) & (line[i] != ",") & (line[i] != " ")):
+                while ( (i < len(line)-1) and \
+                        (line[i] != ",") and \
+                        (line[i] != " ")):
                     dest += (line[i]);
                     i += 1;
                     
@@ -126,7 +139,8 @@ class Assembler:
                 if instruction.strip() in self.arithmetic_logic:
                     # go past the comma and space
                     i += 2;
-                    while ((i < len(line)-1) & (line[i] != ",") & (line[i] != " ")):
+                    while ( (i < len(line)-1) and (line[i] != ",") and \
+                            (line[i] != " ") ):
                         src1 += (line[i]);
                         i += 1;
                 # we use 0's if the instruction is MOV, the register is unused
@@ -136,7 +150,8 @@ class Assembler:
                 # get the second source register
                 # go past the comma and space
                 i += 2;
-                while ((line[i] != ",") & (line[i] != " ") & (i < len(line)-1)):
+                while ( (line[i] != ",") and (line[i] != " ") and \
+                        (i < len(line)-1)):
                     src2 += (line[i]);
                     i += 1;
                 src2 += (line[i]);
@@ -167,9 +182,11 @@ class Assembler:
                 bin += str(immediate); #I flag
                 
                 if instruction.strip() in self.arithmetic_logic:
-                        bin += self.arithmetic_logic[instruction.strip()]; # opcode
+                        # opcode
+                        bin += self.arithmetic_logic[instruction.strip()];
                 else:
-                        bin += self.comp_test[instruction.strip()]; # opcode
+                        # opcode
+                        bin += self.comp_test[instruction.strip()];
                 
                 # s flag
                 bin += "1";
