@@ -10,6 +10,7 @@ Written by Chris Galardi and John Rafferty ~10/2010
 
 # opens file for i/o
 infile = open(sys.argv[1] , 'r');
+infile_copy = open(sys.argv[1] , 'r');
 outfile = open(sys.argv[2], "w");
 
 class Assembler:
@@ -105,6 +106,20 @@ class Assembler:
         
         instruction_index = 0;
         
+        for lines in range(0,self.file_len(sys.argv[1])):
+            label_line = infile_copy.readline().strip();
+            if (label_line[0] == "."):
+                label_name = "";
+                for i in range(1, len(label_line)):
+                    label_name +=label_line[i];
+                #print "branch label: " + label_name;
+                self.label[label_name] = instruction_index+1;
+                instruction_index += 1;
+            else:
+                instruction_index += 1;
+        
+        instruction_index = 0;
+        
         #loop through all lines of the file one by one
         for lines in range(0,self.file_len(sys.argv[1])):
             line = infile.readline().strip();
@@ -183,33 +198,30 @@ class Assembler:
                 print bin;
                 outfile.write(bin + "\n");
                 
-                for i in self.label.keys():
-                    print str(i) + " " + str(self.label[i]);
-                
             elif (instruction[0] == "."):
-                label_name = "";
-                for i in range(1, len(instruction)):
-                    label_name +=instruction[i];
-                #print "branch label: " + label_name;
-                self.label[label_name] = instruction_index+1;
-                instruction_index += 1;
-                
+                print "label";
+            #    label_name = "";
+            #    for i in range(1, len(instruction)):
+            #        label_name +=instruction[i];
+            #    #print "branch label: " + label_name;
+            #    self.label[label_name] = instruction_index+1;
+            #    instruction_index += 1;
             elif (instruction.strip() in self.branch):
                 branch_loc = "";
                 i = len(instruction.strip())+1;
                 while i < len(line):
                     branch_loc += line[i];
                     i += 1;
-                print branch_loc;
                 # begin formatting the binary string
                 bin = "1110";
                 if (instruction.strip() == "b"):
                     bin += self.branch[instruction.strip()];
                 elif (instruction.strip() == "bl"):
                     bin += self.branch[instruction.strip()];
-                
-                print abs(instruction_index-self.label[branch_loc]);
-                print "branch so far: " + bin;
+                offset = 0;
+                offset = abs(instruction_index-self.label[branch_loc]);
+                print "branch so far: " + bin + " " + str(offset);
+                print instruction_index
                 
             else:
                 print "wrong instruction";
