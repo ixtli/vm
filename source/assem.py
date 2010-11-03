@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import sys
 
 #==========FUNCTIONS
@@ -59,6 +60,8 @@ arithmetic_logic = {"ADD" : "0000", "SUB" : "0001", "MOD" : "0010", "MUL" : "001
 comp_test = {"CMP" : "1001", "CMN" : "1010", "TST": "1011", "TEQ" : "1100", "MOV" :
 "1101", "BIC" : "1110", "NOP" : "1111"}
 
+branch = {"BRH" : "1010", "BRL" : "1011"};
+
 #open file for reading
 infile = open(sys.argv[1] , 'r');
 outfile = open(sys.argv[2], "w");
@@ -99,7 +102,7 @@ for lines in range(0,file_len(sys.argv[1])):
             dest += (line[i]);
             i += 1;
         
-        #get the source register, its it arighmetic or logic we grab it
+        #get the source register, if it arighmetic or logic we grab it
         if instruction.strip() in arithmetic_logic:
             i += 2; #go past the comma and space
             while ((i < len(line)-1) & (line[i] != ",") & (line[i] != " ")):
@@ -161,13 +164,20 @@ for lines in range(0,file_len(sys.argv[1])):
         print bin;
         outfile.write(bin + "\n");
 
+        for i in label.keys():
+            print str(i) + " " + str(label[i]);
+
     elif (instruction[0] == "."):
         label_name = "";
         for i in range(1, len(instruction)):
             label_name +=instruction[i];
-        print "branch label: " + label_name;
+        #print "branch label: " + label_name;
         label[label_name] = instruction_index+1;
+        instruction_index += 1;
         
+    elif (instruction.strip() in branch):
+        
+        print "jump";
     else:
         print "wrong instruction";
 
