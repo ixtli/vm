@@ -13,11 +13,10 @@ enum DataProcessingMasks {
 };
 
 enum ShifterMasks {
-    kShiftImmediateMask = 0x000000FF,
-    kShiftRotateMask    = 0x00000300,
-    kShiftRmMask        = 0x0000001F,
+    kShiftTypeMask      = 0x00000010,
+    kShiftRmMask        = 0x0000000F,
     kShiftOpMask        = 0x00000060,
-    kShiftRsMask        = 0x00000380
+    kShiftRsMask        = 0x00000380,
 };
 
 enum ShiftOperations {
@@ -66,7 +65,7 @@ public:
     static bool shift(reg_t &offset, reg_t val, reg_t shift, reg_t op);
     
 private:
-    void shiftOffset(reg_t &offset, bool immediate);
+    void shiftOffset(reg_t &offset);
     
     VirtualMachine *_vm;
     bool _carry_out;

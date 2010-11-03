@@ -9,8 +9,6 @@ Written by Chris Galardi and John Rafferty ~10/2010
 """
 
 # opens file for i/o
-infile = open(sys.argv[1] , 'r');
-infile_copy = open(sys.argv[1] , 'r');
 outfile = open(sys.argv[2], "w");
 
 class Assembler:
@@ -18,6 +16,9 @@ class Assembler:
     """
     Main class for our assembler.
     """
+    
+    # The asm file
+    infile = []
     
     # Member variables
     label = {};
@@ -38,23 +39,23 @@ class Assembler:
     def __init__(self):
         
         """
-        Initialize the class by parsing command line ops
-        """
-    
-    
-    def file_len(self, fname):
-        
-        """
-        Determine the length of the file
+        Initialize the class by reading in the file
         """
         
-        with open(fname) as f:
-                for i, l in enumerate(f):
-                                    pass;
-        return i + 1;
+        f = open(sys.argv[1] , 'r');
+        for line in f:
+            l = line.strip()
+            if len(l) > 0:
+                # Deal with these-style comments
+                if l[0] != "#":
+                    self.infile.append(l)
     
     def explodeOp(self, op):
         splitter = re.compile(r'\w+')
+        return (splitter.findall(op))
+    
+    def explodeLabel(self, op):
+        splitter = re.compile(r'\b([A-Za-z0-9_]+):')
         return (splitter.findall(op))
     
     def decimal_to_binary(self, val):
@@ -98,40 +99,60 @@ class Assembler:
         else:
             return smalloutput;
     
+    def gatherLabels(self):
+        
+        """
+        This parses the file, finding labels and adding them to the table.
+        """
+        
+        previous_was_label = 0
+        instruction_index = 0;
+        for line in self.infile:
+            l = self.explodeLabel(line)
+            if len(l):
+                # It's a label
+                if previous_was_label == 0:
+                    self.label[l[0]] = instruction_index + 1;
+                    previous_was_label == 1
+                else:
+                    # If we don't do this, this function needs to be recurive
+                    # and I don't see a reason to have multiple names
+                    # for one line
+                    print "Only one label per location."
+            else:
+                previous_was_label == 0
+            instruction_index += 1;
+    
     def assemble(self):
         
         """
-        Assemble the file
+        Assemble the file.
         """
         
-        instruction_index = 0;
-        
-        for lines in range(0,self.file_len(sys.argv[1])):
-            label_line = infile_copy.readline().strip();
-            if (label_line[0] == "."):
-                label_name = "";
-                for i in range(1, len(label_line)):
-                    label_name +=label_line[i];
-                #print "branch label: " + label_name;
-                self.label[label_name] = instruction_index+1;
-                instruction_index += 1;
-            else:
-                instruction_index += 1;
+        # Perform the first pass, collecting all labels
+        self.gatherLabels();
         
         instruction_index = 0;
         
-        #loop through all lines of the file one by one
-        for lines in range(0,self.file_len(sys.argv[1])):
-            line = infile.readline().strip();
-            print line;
+        # Perform the second pass, changing the instructions into ops
+        for lines in self.infile:
+            print lines;
             
-            line = self.explodeOp(line)
+            line = self.explodeOp(lines)
+            
+            if len(line) < 2:
+                # Has to be a meta instruciton like a label or seg marker
+                continue
             
             i = 0;
             immediate = 0;
             instruction = line[0];          #the operation (add, etc..)
-            dest = line[1];                 #destination reg
-            src1  = line[2];                #first source register
+            dest = line[1];
+            
+            if len(line) < 3:               #destination reg
+                src1 = "00"
+            else:
+                src1 = line[2];            #first source register
             
             if len(line) > 3:
                 src2 = line[3];             #second source register, Op2
@@ -198,30 +219,18 @@ class Assembler:
                 print bin;
                 outfile.write(bin + "\n");
                 
-            elif (instruction[0] == "."):
-                print "label";
-            #    label_name = "";
-            #    for i in range(1, len(instruction)):
-            #        label_name +=instruction[i];
-            #    #print "branch label: " + label_name;
-            #    self.label[label_name] = instruction_index+1;
-            #    instruction_index += 1;
-            elif (instruction.strip() in self.branch):
-                branch_loc = "";
-                i = len(instruction.strip())+1;
-                while i < len(line):
-                    branch_loc += line[i];
-                    i += 1;
+            elif (instruction in self.branch):
+                branch_loc = dest;
                 # begin formatting the binary string
                 bin = "1110";
-                if (instruction.strip() == "b"):
-                    bin += self.branch[instruction.strip()];
-                elif (instruction.strip() == "bl"):
-                    bin += self.branch[instruction.strip()];
-                offset = 0;
-                offset = abs(instruction_index-self.label[branch_loc]);
+                if (instruction == "b"):
+                    bin += self.branch[instruction];
+                elif (instruction == "bl"):
+                    bin += self.branch[instruction];
+                
+                offset = abs(instruction_index - self.label[branch_loc]);
                 print "branch so far: " + bin + " " + str(offset);
-                print instruction_index
+                print instruction_index;
                 
             else:
                 print "wrong instruction";

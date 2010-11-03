@@ -79,48 +79,31 @@ bool ALU::shift(reg_t &offset, reg_t val, reg_t shift, reg_t op)
     }
 }
 
-void ALU::shiftOffset(reg_t &offset, bool immediate)
+void ALU::shiftOffset(reg_t &offset)
 {
     // Perform the somewhat complex operation of barrel shifting the offset
     // return the carry out of the shift operation
     bool carry_bit = false;
     
-    // Simplest case is when the offset is treated like an immediate
-    if (immediate)
+    reg_t operation = (offset & kShiftOpMask) >> 5;
+    reg_t *value = vm->selectRegister(offset & kShiftRmMask);
+    reg_t shift;
+    
+    if (offset & kShiftTypeMask)
+        // We're shifting by the value in a register
+        shift = *(vm->selectRegister((offset & kShiftRsMask) >> 7));
+    else
+        // We're only shifting by an immediate amount
+        shift = (offset & kShiftRsMask) >> 7;
+    
+    // Shifting zero is a special case where you dont touch the C bit
+    if (shift == 0)
     {
-        // Lower 8 bits of op2 is an immediate value
-        reg_t imm = (offset & kShiftImmediateMask);
-        // Upper two bits is a rotate value between 0 and 4
-        reg_t ror = (offset & kShiftRotateMask) >> 8;
-        
-        // If the following is one op, then checking for zero would
-        // just be more code for no added efficiency
-        
-        // Apparently most compilers will recognize the following idiom
-        // and compile it into a single ROL operation 
-        imm = (imm >> ror) | (imm << (32 - ror));
-        
-        // Store the value
-        offset = imm;
-        
-        // If we're rotating then there is no carry
-    } else {
-        // We need to do a more complex operation
-        reg_t operation = (offset & kShiftOpMask) >> 5;
-        reg_t *value = vm->selectRegister(offset & kShiftRmMask);
-        reg_t *shift = vm->selectRegister((offset & kShiftRsMask) >> 7);
-        
-        // Shifting zero is a special case where you dont touch the C bit
-        if (*shift == 0)
-        {
-            offset = *value;
-            return;
-        }
-        
-        carry_bit = ALU::shift(offset, *value, *shift, operation);
+        offset = *value;
+        return;
     }
     
-    if (carry_bit)
+    if (ALU::shift(offset, *value, shift, operation))
         vm->_psr = C_SET;
     else
         vm->_psr = C_CLEAR;
@@ -140,21 +123,21 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
     switch (op)
     {
         case kADD:
-        shiftOffset(op2, I);
+        if (!I) shiftOffset(op2);
         dest = *source + op2;
         cycles += kADDCycles;
         break;
         
         case kSUB:
         arithmetic = true;
-        shiftOffset(op2, I);
+        if (!I) shiftOffset(op2);
         dest = *source - op2;
         cycles += kSUBCycles;
         break;
         
         case kMUL:
         arithmetic = true;
-        shiftOffset(op2, I);
+        if (!I) shiftOffset(op2);
         dest = ((*source) * op2); //store lowest 32 bits on Rd
         //dest = ((*source) * op2) & 4294967295; //store lowest 32 bits on Rd
         //pq[0] = (*source * op2) >> 32; //shift 32 bits right, to give highest bits
@@ -162,48 +145,48 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
         break;
         
         case kMOD:
-        shiftOffset(op2, I);
+        if (!I) shiftOffset(op2);
         dest = *source % op2;
         cycles += kMODCycles;
         break;
         
         case kDIV:
-        shiftOffset(op2, I);
+        if (!I) shiftOffset(op2);
         dest = *source / op2;
         cycles += kDIVCycles;
         break;
         
         case kMOV:
         arithmetic = false;
-        shiftOffset(op2, I);
+        if (!I) shiftOffset(op2);
         dest = op2;
         cycles += kMOVCycles;
         break;
         
         case kAND:
         arithmetic = false;
-        shiftOffset(op2, I);
+        if (!I) shiftOffset(op2);
         dest = *source & op2;
         cycles += kANDCycles;
         break;
         
         case kORR:
         arithmetic = false;
-        shiftOffset(op2, I);
+        if (!I) shiftOffset(op2);
         dest = *source | op2;
         cycles += kORRCycles;
         break;
         
         case kXOR:
         arithmetic = false;
-        shiftOffset(op2, I);
+        if (!I) shiftOffset(op2);
         dest = *source ^ op2;
         cycles += kXORCycles;
         break;
         
         case kNOT:
         arithmetic = false;
-        shiftOffset(op2, I);
+        if (!I) shiftOffset(op2);
         dest = ~(*source);
         cycles += kNOTCycles;
         break;
@@ -211,7 +194,7 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
         case kCMP:
         arithmetic = false;
         commit = false;
-        shiftOffset(op2, I);
+        if (!I) shiftOffset(op2);
         dest = *source - op2;
         cycles += kCMPCycles;
         break;
@@ -219,7 +202,7 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
         case kCMN:
         arithmetic = false;
         commit = false;
-        shiftOffset(op2, I);
+        if (!I) shiftOffset(op2);
         dest = *source + op2;
         cycles += kCMNCycles;
         break;
@@ -227,7 +210,7 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
         case kTST:
         arithmetic = false;
         commit = false;
-        shiftOffset(op2, I);
+        if (!I) shiftOffset(op2);
         dest = *source & op2;
         cycles += kTSTCycles;
         break;
@@ -235,14 +218,14 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
         case kTEQ:
         arithmetic = false;
         commit = false;
-        shiftOffset(op2, I);
+        if (!I) shiftOffset(op2);
         dest = *source ^ op2;
         cycles += kTEQCycles;
         break;
         
         case kBIC:
         arithmetic = false;
-        shiftOffset(op2, I);
+        if (!I) shiftOffset(op2);
         dest = *source & ~op2;
         cycles += kBICCycles;
         break;
