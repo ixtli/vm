@@ -31,7 +31,7 @@ class Assembler:
                     "teq" : "1100", "mov" : "1101", "bic" : "1110",
                     "nop" : "1111"}
     
-    branch = {  "brh" : "1010", "brl" : "1011"};
+    branch = {"b" : "1010", "bl" : "1011"};
     
     # Member function definitions
     def __init__(self):
@@ -39,8 +39,7 @@ class Assembler:
         """
         Initialize the class by parsing command line ops
         """
-        
-        
+    
     
     def file_len(self, fname):
         
@@ -185,7 +184,7 @@ class Assembler:
                 outfile.write(bin + "\n");
                 
                 for i in self.label.keys():
-                    print str(i) + " " + str(label[i]);
+                    print str(i) + " " + str(self.label[i]);
                 
             elif (instruction[0] == "."):
                 label_name = "";
@@ -195,8 +194,22 @@ class Assembler:
                 self.label[label_name] = instruction_index+1;
                 instruction_index += 1;
                 
-            elif (instruction in self.branch):
-                print "jump";
+            elif (instruction.strip() in self.branch):
+                branch_loc = "";
+                i = len(instruction.strip())+1;
+                while i < len(line):
+                    branch_loc += line[i];
+                    i += 1;
+                print branch_loc;
+                # begin formatting the binary string
+                bin = "1110";
+                if (instruction.strip() == "b"):
+                    bin += self.branch[instruction.strip()];
+                elif (instruction.strip() == "bl"):
+                    bin += self.branch[instruction.strip()];
+                
+                print abs(instruction_index-self.label[branch_loc]);
+                print "branch so far: " + bin;
                 
             else:
                 print "wrong instruction";
