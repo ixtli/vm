@@ -173,8 +173,8 @@ class Assembler:
                 
                 # s flag
                 bin += "1";
-                bin += self.decimal_to_binary(int(bindest)); # Rd
                 bin += self.decimal_to_binary(int(binsrc1)); # Rs
+                bin += self.decimal_to_binary(int(bindest)); # Rd
                 # padding if its not being shifted
                 bin += "00000";
                 
