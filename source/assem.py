@@ -98,14 +98,14 @@ class Assembler:
             
             i = 0;
             immediate = 0;
-            instruction = "";           #the operation (ADD, SUB, AND, OR, MOV, etc)
+            instruction = "";           #the operation (add, sub, and, or, mov, etc)
             dest = "";                  #destination reg
             src1  = "";                 #first source register
             src2 = "";                  #second source register, Op2
             cond_code = "1110";         #condition code
             bin = cond_code;
             
-            # get the operation mnemonic (ADD, SUB, MOD, AND, etc)
+            # get the operation mnemonic (add, sub, mod, and, etc)
             while (line[i] != " ") & (i < len(line)-1) & (line[i] != "\n"):
                 instruction += (line[i]);
                 i += 1;
@@ -129,9 +129,9 @@ class Assembler:
                     while ((i < len(line)-1) & (line[i] != ",") & (line[i] != " ")):
                         src1 += (line[i]);
                         i += 1;
-                # we use 0's if the instruction is MOV, the register is unused
+                # we use 0's if the instruction is mov, the register is unused
                 else:
-                    # needs 2 places because src[0] is assumed to be R usually
+                    # needs 2 places because src[0] is assumed to be r usually
                     src1 = "00"; 
                 # get the second source register
                 # go past the comma and space
@@ -164,12 +164,15 @@ class Assembler:
                     i += 1;
                     
                 bin += "00";
-                bin += str(immediate); #I flag
+                # I flag
+                bin += str(immediate);
                 
                 if instruction.strip() in self.arithmetic_logic:
-                        bin += self.arithmetic_logic[instruction.strip()]; # opcode
+                        # opcode
+                        bin += self.arithmetic_logic[instruction.strip()];
                 else:
-                        bin += self.comp_test[instruction.strip()]; # opcode
+                        # opcode
+                        bin += self.comp_test[instruction.strip()];
                 
                 # s flag
                 bin += "1";
@@ -179,7 +182,8 @@ class Assembler:
                 bin += "00000";
                 
                 if immediate == 0:
-                    bin += self.decimal_to_binary(int(binsrc2)); # Op2
+                    # Op2
+                    bin += self.decimal_to_binary(int(binsrc2));
                 else:
                     bin += self.decimal_to_binary(int(src2));
                 
