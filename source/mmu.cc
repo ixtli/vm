@@ -76,9 +76,6 @@ reg_t MMU::loadProgramImageFile(const char *path, reg_t to, bool writeBreak)
         _memory[(to >> 2) + (i++)] = _binary_to_int(buffer);
     }
     
-    // This last increment never really happened
-    i--;
-    
     myfile.close();
     printf("Done.\n");
     
