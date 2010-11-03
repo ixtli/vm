@@ -227,10 +227,15 @@ class Assembler:
                     bin += self.branch[instruction];
                 elif (instruction == "bl"):
                     bin += self.branch[instruction];
-                
                 offset = abs(instruction_index - self.label[branch_loc]);
-                print "branch so far: " + bin + " " + str(offset);
-                print instruction_index;
+                
+                # format the offset as 2's comp. and add it to the instruction
+                binoffset = self.decimal_to_binary(offset);
+                actual_offset = int(binoffset, 2)-(1<<24);
+                bin += self.decimal_to_binary(abs(actual_offset));
+                
+                print bin;
+                outfile.write(bin + "\n");
                 
             else:
                 print "wrong instruction";
