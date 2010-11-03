@@ -71,13 +71,12 @@ reg_t MMU::loadProgramImageFile(const char *path, reg_t to, bool writeBreak)
     while (myfile.good() && i+1 < _memory_size )
     {
         myfile.getline(buffer, 255);
+        if (strlen(buffer) < 32)
+            continue;
         // 'to' is a byte address into memory, make sure to divide by 4
         // because we're reading from an array of word-sized values
         _memory[(to >> 2) + (i++)] = _binary_to_int(buffer);
     }
-    
-    // This last increment never really happened
-    i--;
     
     myfile.close();
     printf("Done.\n");
