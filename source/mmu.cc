@@ -9,7 +9,7 @@
 
 #define BREAK_INTERRUPT     0xEF000000
 
-MMU::MMU(VirtualMachine *vm, size_t size, size_t rtime, size_t wtime) : 
+MMU::MMU(VirtualMachine *vm, reg_t size, cycle_t rtime, cycle_t wtime) : 
     _vm(vm), _memory_size(size), _read_time(rtime), _write_time(wtime)
 {}
 
@@ -23,7 +23,7 @@ MMU::~MMU()
 
 bool MMU::init()
 {
-    printf("Initializing MMU: %lib RAM\n", _memory_size);
+    printf("Initializing MMU: %ub RAM\n", _memory_size);
     
     // Make sure we have a vm
     if (!_vm) return (true);
@@ -43,7 +43,7 @@ bool MMU::init()
     return (false);
 }
 
-size_t MMU::loadFile(const char *path, size_t to, bool writeBreak)
+reg_t MMU::loadFile(const char *path, reg_t to, bool writeBreak)
 {
     char buffer[256];
     std::ifstream myfile(path);
@@ -110,10 +110,20 @@ bool MMU::writeOut(const char *path)
     return (false);
 }
 
-size_t MMU::write(size_t addr, reg_t valueToSave)
+cycle_t MMU::writeByte(reg_t addr, char valueToSave)
 {
     if (addr >= _memory_size)
-        return 0;
+        return (0);
+    
+    _memory[addr] = valueToSave;
+    
+    return (_write_time);
+}
+
+cycle_t MMU::writeWord(reg_t addr, reg_t valueToSave)
+{
+    if (addr >= _memory_size)
+        return (0);
     
     // Addr is a byte address, but we need to read word aligned
     // so make sure to divide by 4
@@ -122,7 +132,7 @@ size_t MMU::write(size_t addr, reg_t valueToSave)
     return (_write_time);
 }
 
-size_t MMU::writeBlock(size_t addr, reg_t *data, size_t size)
+cycle_t MMU::writeBlock(reg_t addr, reg_t *data, reg_t size)
 {
     if ((addr + size) >= _memory_size)
         return 0;
@@ -135,7 +145,7 @@ size_t MMU::writeBlock(size_t addr, reg_t *data, size_t size)
     return (_write_time);
 }
 
-size_t MMU::readWord(size_t addr, reg_t &valueToRet)
+cycle_t MMU::readWord(reg_t addr, reg_t &valueToRet)
 {
     if ((addr + kRegSize) > _memory_size)
         return 0;
@@ -147,7 +157,7 @@ size_t MMU::readWord(size_t addr, reg_t &valueToRet)
     return (_read_time);
 }
 
-size_t MMU::readByte(size_t addr, char &valueToRet)
+cycle_t MMU::readByte(reg_t addr, char &valueToRet)
 {
     if (addr >= _memory_size)
         return 0;
@@ -157,13 +167,13 @@ size_t MMU::readByte(size_t addr, char &valueToRet)
     return (_read_time);
 }
 
-size_t MMU::readRange(size_t start, size_t end, bool hex, char **ret)
+cycle_t MMU::readRange(reg_t start, reg_t end, bool hex, char **ret)
 { 
     // Whats the max value?
     int length = 25; // 10 + 10 + \n + \0 + \t + - + ' '
     char temp[length];
-    size_t count = end - start;
-    size_t last = 0;
+    reg_t count = end - start;
+    reg_t last = 0;
     *ret = (char *) malloc (sizeof(char) * count * length);
     
     for (int i = 0; start + i <= end; i++)
@@ -184,7 +194,7 @@ void MMU::abort(reg_t &location)
     fprintf(stderr, "MMU ABORT: Read error %#x.\n", location);
 }
 
-size_t MMU::singleTransfer(const STFlags *f)
+cycle_t MMU::singleTransfer(const STFlags *f)
 {
     // The base register is where the address comes from
     reg_t *base = vm->selectRegister(f->rs);

@@ -92,10 +92,11 @@ public:
     VirtualMachine();
     ~VirtualMachine();
 
-    bool init(const char *mem_in, const char *mem_out, size_t mem_size);
-    void run();
-    void installJumpTable(reg_t *data, size_t size);
-    void installIntFunctions(reg_t *data, size_t size);
+    bool init(const char *mem_in, const char *mem_out, reg_t mem_size);
+    void run(bool break_after_fex);
+    void installJumpTable(reg_t *data, reg_t size);
+    void installIntFunctions(reg_t *data, reg_t size);
+    bool loadProgramImage(const char *path, reg_t addr, reg_t swords);
     
     // Helper methods that might be nice for other things...
     inline reg_t *selectRegister(char val)
@@ -139,8 +140,10 @@ public:
     char *operation, *response;
     size_t opsize, respsize;
 private:
+    void resetSegmentRegisters();
+    void resetGeneralRegisters();
     bool evaluateConditional();
-    size_t execute();
+    cycle_t execute();
     void eval(char *op);
     
     MMU *mmu;
@@ -158,10 +161,10 @@ private:
     reg_t _ir;
     
     // information about memory
-    size_t _int_table_size, _int_function_size;
+    reg_t _int_table_size, _int_function_size;
     
     // state info
-    size_t _cycle_count;
+    cycle_t _cycle_count;
 };
 
 // Main VM context

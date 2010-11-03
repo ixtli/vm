@@ -5,6 +5,7 @@
 #include "includes/mmu.h"
 #include "includes/alu.h"
 #include "includes/fpu.h"
+#include "includes/util.h"
 
 // Macros for checking the PSR
 #define N_SET     (_psr & kPSRNBit)
@@ -130,10 +131,10 @@ bool VirtualMachine::evaluateConditional()
     }
 }
 
-size_t VirtualMachine::execute()
+cycle_t VirtualMachine::execute()
 {
     // return this to tell how many cycles the op took
-    size_t cycles = 0;
+    cycle_t cycles = 0;
     // Parse the Operation Code
     // Test to see if it has a 0 in the first place of the opcode
     if ((_ir & 0x08000000) == 0x0)
@@ -222,8 +223,54 @@ VirtualMachine::~VirtualMachine()
     delete mmu;
 }
 
+bool VirtualMachine::loadProgramImage(
+    const char *path, reg_t addr, reg_t swords)
+{
+    // Copy program image into main memory
+    
+    // Convert program image into bit array
+    
+    // Copy array into main memory
+    
+    // Copy command line arguments onto the stack
+    
+    // Allocate stack space before code
+    _ss = addr + (swords << 2);
+    printf("%u words of stack allocated at %#x\n", swords, _ss);
+    _cs = _ss + 1;
+    _ds = 0;
+    
+    // Report
+    printf("Code segment begins at %#x\n", _cs);
+    printf("Data segment begins at %#x\n", _ds);
+    
+    // Initialize program state
+    resetGeneralRegisters();
+    _psr = kPSRDefault;
+    _fpsr = 0;
+    
+    // Jump to _main
+    // TODO: Make this jump to the main label, not the top
+    _pc = _cs;
+}
+
+void VirtualMachine::resetSegmentRegisters()
+{
+    _cs = 0; _ds = 0; _ss = 0;
+}
+
+void VirtualMachine::resetGeneralRegisters()
+{
+    for (int i = 0; i < sizeof(_r); i++)
+        _r[i] = 0;
+    for (int i = 0; i < sizeof(_fpr); i++)
+        _fpr[i] = 0;
+    for (int i = 0; i < sizeof(_pq); i++)
+        _pq[i] = 0;
+}
+
 bool VirtualMachine::init(  const char *mem_in, const char *mem_out,
-                            size_t mem_size)
+                            reg_t mem_size)
 {
     if (pthread_mutex_init(&waiting, NULL))
     {
@@ -231,8 +278,10 @@ bool VirtualMachine::init(  const char *mem_in, const char *mem_out,
         return (true);
     }
     
+    // Initialize virtual machine constructs here
     terminate = 0;
     
+    // Initialize command and status server
     printf("Initializing server... \n");
     ms = new MonitorServer();
     if (ms->init())
@@ -240,6 +289,7 @@ bool VirtualMachine::init(  const char *mem_in, const char *mem_out,
     if (ms->run())
         return (true);
     
+    // Initialize actual machine
     printf("Initializing virtual machine...\n");
     printf("Registers size: %lu bytes.\n", kRegSize);
     
@@ -260,34 +310,28 @@ bool VirtualMachine::init(  const char *mem_in, const char *mem_out,
     // Init cycle count
     _cycle_count = 0;
     
+    // Initialize required default machine state
+    _pc = 0;
+    _psr = kPSRDefault;
+    _fpsr = 0;
+    
+    // Load interrupt controller
     printf("Loading interrupt controller.\n");
     icu = new InterruptController(this);
     icu->init();
     
-    // TODO:  Have the machine do this at start up
-    // Set up a sane operating environment
+    // Create initial sane environment
+    resetGeneralRegisters();
+    resetSegmentRegisters();
     
-    // Start the program at the byte after the end of the interrupt functions
-    _pc = _int_table_size + _int_function_size;
+    // Initialize the operating system here by running an interrupt that breaks
+    // at the end, returning control to us
     
-    // Advance pc to allocate stack space
-    _ss = _pc;
-    _pc += kDefaultStackSpace << 2;
-    printf("%u words of stack allocated at %#x\n", kDefaultStackSpace, _ss);
-    
-    // The code segment starts after the stack segment
-    _cs = _pc;
-    printf("Code segment begins at %#x\n", _cs);
-    
-    // Load memory image at PC.
-    _ds = _pc;
-    _ds += mmu->loadFile(mem_in, _cs, true);
-    // Advance one byte further to begin the data segment
-    _ds += kRegSize;
-    printf("Data segment begins at %#x\n", _ds);
-    
-    // Set up PSR
-    _psr = kPSRDefault;
+    // TODO: Make the OS load the program image through an interrupt
+    // run(true);
+    // Load program right after function table
+    loadProgramImage(mem_in, _int_table_size + _int_function_size,
+        kDefaultStackSpace);
     
     // We can now start the Fetch EXecute cycle
     fex = true;
@@ -311,11 +355,11 @@ void VirtualMachine::eval(char *op)
     
         pch = strtok(NULL, " ");
         if (pch)
-            val = atoi(pch);
+            val = _hex_to_int(pch);
         else
             val = 0;
     
-        mmu->write(addr, val);
+        mmu->writeWord(addr, val);
     
         response = (char *)malloc(sizeof(char) * 512);
         sprintf(response, "Value '%i' written to '%#x'.\n",
@@ -363,7 +407,7 @@ void VirtualMachine::eval(char *op)
         pch = strtok(NULL, " ");
         
         if (pch)
-            instruction = atoi(pch);
+            instruction = (reg_t) _hex_to_int(pch);
         else
             instruction = 0;
         
@@ -407,7 +451,7 @@ void VirtualMachine::eval(char *op)
     respsize = strlen(response);
 }
 
-void VirtualMachine::run()
+void VirtualMachine::run(bool break_after_fex)
 {
     printf("Starting execution at %#x\n", _pc);
     while (fex)
@@ -434,6 +478,8 @@ void VirtualMachine::run()
         _cycle_count += execute();
     }
     
+    if (break_after_fex) return;
+    
     while (!terminate)
     {
         // Wait for something to happen
@@ -452,17 +498,17 @@ void VirtualMachine::run()
     printf("Exiting...\n");
 }
 
-void VirtualMachine::installJumpTable(reg_t *data, size_t size)
+void VirtualMachine::installJumpTable(reg_t *data, reg_t size)
 {
     mmu->writeBlock(0x0, data, size);
     _int_table_size = size;
-    printf("%lub interrupt jump table at 0x0.\n", size);
+    printf("%ub interrupt jump table at 0x0.\n", size);
 }
 
-void VirtualMachine::installIntFunctions(reg_t *data, size_t size)
+void VirtualMachine::installIntFunctions(reg_t *data, reg_t size)
 {
     mmu->writeBlock(_int_table_size, data, size);
     _int_function_size = size;
-    printf("%lub interrupt functions at %#x.\n", size, (reg_t)_int_table_size);
+    printf("%ub interrupt functions at %#x.\n", size, (reg_t)_int_table_size);
 }
 

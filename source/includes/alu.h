@@ -60,7 +60,7 @@ public:
     bool init();
     
     // Operational: must return the timing
-    size_t dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2);
+    cycle_t dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2);
     
     // Access to the barrel shifter.
     static bool shift(reg_t &offset, reg_t val, reg_t shift, reg_t op);

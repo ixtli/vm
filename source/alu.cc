@@ -128,9 +128,9 @@ void ALU::shiftOffset(reg_t &offset, bool immediate)
     return;
 }
 
-size_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
+cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
 {
-    size_t cycles = 0;
+    cycle_t cycles = 0;
     bool shift_carry = false;
     bool arithmetic = true;
     bool commit = true;

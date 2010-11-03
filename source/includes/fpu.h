@@ -34,7 +34,7 @@ public:
     bool init();
     
     // Operational: must return the timing
-    size_t execute(char op, reg_t &fps, reg_t &fpd, reg_t &fpn, reg_t &fpm);
+    cycle_t execute(char op, reg_t &fps, reg_t &fpd, reg_t &fpn, reg_t &fpm);
 private:
     VirtualMachine *_vm;
 };

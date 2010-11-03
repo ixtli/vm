@@ -31,27 +31,29 @@ class VirtualMachine;
 class MMU
 {
 public:
-    MMU(VirtualMachine *vm, size_t size, size_t rtime, size_t wtime);
+    MMU(VirtualMachine *vm, reg_t size, cycle_t rtime, cycle_t wtime);
     ~MMU();
     
     bool init();
     
-    size_t loadFile(const char *path, size_t to, bool writeBreak);
+    reg_t loadFile(const char *path, reg_t to, bool writeBreak);
     bool writeOut(const char *path);
     
     // Operational: must return the timing
-    size_t singleTransfer(const STFlags *f);
-    size_t write(size_t addr, reg_t valueToSave);
-    size_t writeBlock(size_t addr, reg_t *data, size_t size);
-    size_t readWord(size_t addr, unsigned int &valueToRet);
-    size_t readByte(size_t addr, char &valueToRet);
-    size_t readRange(size_t start, size_t end, bool hex, char **ret);
+    cycle_t singleTransfer(const STFlags *f);
+    cycle_t writeWord(reg_t addr, reg_t valueToSave);
+    cycle_t writeByte(reg_t addr, char valueToSave);
+    cycle_t writeBlock(reg_t addr, reg_t *data, reg_t size);
+    cycle_t readWord(reg_t addr, unsigned int &valueToRet);
+    cycle_t readByte(reg_t addr, char &valueToRet);
+    cycle_t readRange(reg_t start, reg_t end, bool hex, char **ret);
 
 private:
     void abort(reg_t &location);
     
     VirtualMachine *_vm;
-    size_t _memory_size, _read_time, _write_time;
+    reg_t _memory_size;
+    cycle_t _read_time, _write_time;
     reg_t *_memory;
 };
 

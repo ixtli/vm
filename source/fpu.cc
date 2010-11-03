@@ -16,10 +16,10 @@ bool FPU::init()
     return (false);
 }
 
-size_t FPU::execute(char op, reg_t &fps, reg_t &fpd, reg_t &fpn, reg_t &fpm)
+cycle_t FPU::execute(char op, reg_t &fps, reg_t &fpd, reg_t &fpn, reg_t &fpm)
 {
     printf("=================here\n");
-    size_t cycles = 0;
+    cycle_t cycles = 0;
     bool shift_carry = false;
     bool arithmetic = false;
     reg_t *_fps = vm->selectRegister(fps);

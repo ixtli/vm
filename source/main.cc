@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
     char c;
     char *outpath = NULL;
     char *inpath = NULL;
-    size_t mem_size = kMinimumMemorySize;
+    reg_t mem_size = kMinimumMemorySize;
     
     // Register signal
     void sigint_handler(int sig);
@@ -91,7 +91,7 @@ int main(int argc, char *argv[])
     }
     
     // Run the VM
-    vm->run();
+    vm->run(false);
     
     // Clean up and exit
     delete vm;
