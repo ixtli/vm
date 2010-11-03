@@ -1,5 +1,6 @@
 #!/usr/bin/python
 import sys
+import re
 
 """
 An assembler for YAAA.
@@ -21,15 +22,16 @@ class Assembler:
     label = {};
     
     #the mnemonics of all arithmetic and logic instructions
-    arithmetic_logic = {"add" : "0000", "sub" : "0001", "mod" : "0010", "mul" : "0011",
-    "div" : "0100", "and" : "0101", "orr" : "0110", "not" : "0111" ,"xor" :
-    "1000"}
+    arithmetic_logic = {    "add" : "0000", "sub" : "0001", "mod" : "0010",
+                            "mul" : "0011", "div" : "0100", "and" : "0101",
+                            "orr" : "0110", "not" : "0111" ,"xor" : "1000"}
     
     #mnemonics for comparing and testing
-    comp_test = {"cmp" : "1001", "cmn" : "1010", "tst": "1011", "teq" : "1100", "mov" :
-    "1101", "bic" : "1110", "nop" : "1111"}
+    comp_test = {   "cmp" : "1001", "cmn" : "1010", "tst": "1011",
+                    "teq" : "1100", "mov" : "1101", "bic" : "1110",
+                    "nop" : "1111"}
     
-    branch = {"brh" : "1010", "brl" : "1011"};
+    branch = {  "brh" : "1010", "brl" : "1011"};
     
     # Member function definitions
     def __init__(self):
@@ -50,6 +52,10 @@ class Assembler:
                 for i, l in enumerate(f):
                                     pass;
         return i + 1;
+    
+    def explodeOp(self, op):
+        splitter = re.compile(r'\w+')
+        return (splitter.findall(op))
     
     def decimal_to_binary(self, val):
         
@@ -103,58 +109,33 @@ class Assembler:
         #loop through all lines of the file one by one
         for lines in range(0,self.file_len(sys.argv[1])):
             line = infile.readline().strip();
-            
             print line;
+            
+            line = self.explodeOp(line)
             
             i = 0;
             immediate = 0;
-            instruction = "";           #the operation (add, sub, and, or, mov, etc)
-            dest = "";                  #destination reg
-            src1  = "";                 #first source register
-            src2 = "";                  #second source register, Op2
-            cond_code = "1110";         #condition code
+            instruction = line[0];          #the operation (add, etc..)
+            dest = line[1];                 #destination reg
+            src1  = line[2];                #first source register
+            
+            if len(line) > 3:
+                src2 = line[3];             #second source register, Op2
+            else:
+                src2 = "00"
+            
+            cond_code = "1110";             #condition code
             bin = cond_code;
             
-            # get the operation mnemonic (ADD, SUB, MOD, AND, etc)
-            while (line[i] != " ") and (i < len(line)-1) and (line[i] != "\n"):
-                instruction += (line[i]);
-                i += 1;
-            instruction += line[i];
-            
             # check if its an arithmetic/logic/compare/test instruction
-            if (instruction.strip() in self.arithmetic_logic) or \
-                (instruction.strip() in self.comp_test): 
-                # bin += arithmetic_logic[instruction.strip()];
-                # print bin;
+            if (instruction in self.arithmetic_logic) or \
+                (instruction in self.comp_test): 
                 i += 1;
                 
-                # get the destination register
-                while ( (i < len(line)-1) and \
-                        (line[i] != ",") and \
-                        (line[i] != " ")):
-                    dest += (line[i]);
-                    i += 1;
-                    
-                # get the source register, if it arighmetic or logic we grab it
-                if instruction.strip() in self.arithmetic_logic:
-                    # go past the comma and space
-                    i += 2;
-                    while ( (i < len(line)-1) and (line[i] != ",") and \
-                            (line[i] != " ") ):
-                        src1 += (line[i]);
-                        i += 1;
-                # we use 0's if the instruction is mov, the register is unused
-                else:
-                    # needs 2 places because src[0] is assumed to be r usually
-                    src1 = "00"; 
-                # get the second source register
-                # go past the comma and space
-                i += 2;
-                while ( (line[i] != ",") and (line[i] != " ") and \
-                        (i < len(line)-1)):
-                    src2 += (line[i]);
-                    i += 1;
-                src2 += (line[i]);
+                # mov is a special case
+                if instruction == "mov":
+                    src2 = src1
+                    src1 = "00"
                 
                 # check if there is an r (register), or if its immediate
                 if (src2[0] == "r"): 
@@ -162,32 +143,28 @@ class Assembler:
                 else:
                     immediate = 1;
                 
-                bindest = "";
-                binsrc1 = "";
-                binsrc2 = "";
-                i = 1;
-                while i < len(dest):
-                    bindest += dest[i]; 
-                    i += 1;
-                i = 1;
-                while i < len(src1):
-                    binsrc1 += src1[i];
-                    i += 1;
-                i = 1;
-                while i < len(src2):
-                    binsrc2 += src2[i];
-                    i += 1;
-                    
+                bindest = dest[1:];
+                
+                if src1[0] == 'r':
+                    binsrc1 = src1[1:];
+                else:
+                    binsrc1 = src1;
+                
+                if src2[0] == 'r':
+                    binsrc2 = src2[1:];
+                else:
+                    binsrc2 = src2;
+                
                 bin += "00";
                 # I flag
                 bin += str(immediate);
                 
-                if instruction.strip() in self.arithmetic_logic:
+                if instruction in self.arithmetic_logic:
                         # opcode
-                        bin += self.arithmetic_logic[instruction.strip()];
+                        bin += self.arithmetic_logic[instruction];
                 else:
                         # opcode
-                        bin += self.comp_test[instruction.strip()];
+                        bin += self.comp_test[instruction];
                 
                 # s flag
                 bin += "1";
@@ -207,7 +184,6 @@ class Assembler:
                 print bin;
                 outfile.write(bin + "\n");
                 
-                
                 for i in self.label.keys():
                     print str(i) + " " + str(label[i]);
                 
@@ -219,7 +195,7 @@ class Assembler:
                 self.label[label_name] = instruction_index+1;
                 instruction_index += 1;
                 
-            elif (instruction.strip() in self.branch):
+            elif (instruction in self.branch):
                 print "jump";
                 
             else:
