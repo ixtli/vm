@@ -79,15 +79,41 @@ bool ALU::shift(reg_t &offset, reg_t val, reg_t shift, reg_t op)
     }
 }
 
+void ALU::MOVShift(reg_t &offset, reg_t *value)
+{
+    // The format for Op2 is a bit different for MOV
+    reg_t operation = (offset & kMOVShiftOp);
+    reg_t shift;
+    
+    // The bit masked by kMOVShiftType says if its immediate or not
+    if (offset & kMOVShiftType)
+        // Shifting by value in a register (not immediate)
+        shift = *(vm->selectRegister( offset & kMOVShiftRs >> 3));
+    else
+        // Shift by an immediate value
+        shift = (offset & kMOVShiftLiteral) >> 3;
+    
+    // Shifting zero is a special case where you dont touch the C bit
+    if (shift == 0)
+    {
+        offset = *value;
+        return;
+    }
+    
+    if (ALU::shift(offset, *value, shift, operation))
+        vm->_psr = C_SET;
+    else
+        vm->_psr = C_CLEAR;
+    
+    return; 
+}
+
 void ALU::shiftOffset(reg_t &offset)
 {
     // Perform the somewhat complex operation of barrel shifting the offset
-    // return the carry out of the shift operation
-    bool carry_bit = false;
-    
     reg_t operation = (offset & kShiftOpMask) >> 5;
-    reg_t *value = vm->selectRegister(offset & kShiftRmMask);
     reg_t shift;
+    reg_t *value = vm->selectRegister(offset & kShiftRmMask);
     
     if (offset & kShiftTypeMask)
         // We're shifting by the value in a register
@@ -158,8 +184,17 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
         
         case kMOV:
         arithmetic = false;
-        if (!I) shiftOffset(op2);
-        dest = op2;
+        // This is a special case
+        if (!I)
+        {
+            // so use the special shift format
+            MOVShift(op2, source);
+            dest = op2;
+        } else {
+            // Make a giant literal out of 
+            dest = (*source << 10) | op2;
+        }
+        
         cycles += kMOVCycles;
         break;
         

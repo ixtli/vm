@@ -244,7 +244,6 @@ bool VirtualMachine::loadProgramImage(
     _ds = _cs + image_size;
     
     // Report
-    
     printf("Data segment begins at %#x\n", _ds);
     
     // Initialize program state

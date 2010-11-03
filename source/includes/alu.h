@@ -19,6 +19,14 @@ enum ShifterMasks {
     kShiftRsMask        = 0x00000380,
 };
 
+
+enum MOVOpShiftMasks {
+    kMOVShiftRs         = 0x000000F8,
+    kMOVShiftLiteral    = 0x000001F8,
+    kMOVShiftType       = 0x00000003,
+    kMOVShiftOp         = 0x00000004
+}
+
 enum ShiftOperations {
     kShiftLSL, kShiftLSR, kShiftASR, kShiftROR
 };
@@ -66,6 +74,7 @@ public:
     
 private:
     void shiftOffset(reg_t &offset);
+    void MOVShift(reg_t &offset, reg_t *value);
     
     VirtualMachine *_vm;
     bool _carry_out;

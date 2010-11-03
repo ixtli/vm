@@ -33,7 +33,7 @@ class Assembler:
                     "teq" : "1100", "mov" : "1101", "bic" : "1110",
                     "nop" : "1111"}
     
-    branch = {"b" : "1010", "bl" : "1011"};
+    branch = {  "b" : "1010", "bl" : "1011"};
     
     # Member function definitions
     def __init__(self):
@@ -56,6 +56,10 @@ class Assembler:
     
     def explodeLabel(self, op):
         splitter = re.compile(r'\b([A-Za-z0-9_]+):')
+        return (splitter.findall(op))
+
+    def explodeComment(self, op):
+        splitter = re.compile(r'(#).*$\n?')
         return (splitter.findall(op))
     
     def decimal_to_binary(self, val):
@@ -99,29 +103,32 @@ class Assembler:
         else:
             return smalloutput;
     
-    def gatherLabels(self):
+    def firstPass(self):
         
         """
         This parses the file, finding labels and adding them to the table.
         """
         
-        previous_was_label = 0
+        previous_was_label = 0;
         instruction_index = 0;
         for line in self.infile:
-            l = self.explodeLabel(line)
-            if len(l):
+            label = self.explodeLabel(line)
+            if len(label):
                 # It's a label
                 if previous_was_label == 0:
-                    self.label[l[0]] = instruction_index + 1;
-                    previous_was_label == 1
+                    self.label[label[0]] = instruction_index + 1;
+                    previous_was_label == 1;
+                    self.infile.remove(line);
                 else:
                     # If we don't do this, this function needs to be recurive
                     # and I don't see a reason to have multiple names
                     # for one line
-                    print "Only one label per location."
+                    self.infile.remove(line);
+                    print "Only one label per location, please."
             else:
                 previous_was_label == 0
-            instruction_index += 1;
+                instruction_index += 1;
+            
     
     def assemble(self):
         
@@ -130,7 +137,7 @@ class Assembler:
         """
         
         # Perform the first pass, collecting all labels
-        self.gatherLabels();
+        self.firstPass();
         
         instruction_index = 0;
         
@@ -139,10 +146,6 @@ class Assembler:
             print lines;
             
             line = self.explodeOp(lines)
-            
-            if len(line) < 2:
-                # Has to be a meta instruciton like a label or seg marker
-                continue
             
             i = 0;
             immediate = 0;
@@ -214,8 +217,6 @@ class Assembler:
                 else:
                     bin += self.decimal_to_binary(int(src2));
                 
-                instruction_index += 1;
-                
                 print bin;
                 outfile.write(bin + "\n");
                 
@@ -235,6 +236,7 @@ class Assembler:
             else:
                 print "wrong instruction";
                 
+            instruction_index += 1;
 
 if __name__ == "__main__":
     a = Assembler()
