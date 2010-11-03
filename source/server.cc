@@ -207,6 +207,7 @@ void *serve( void *ptr )
                         {
                             send(i, vm->response, vm->respsize, 0);
                             free(vm->response);
+                            vm->response = NULL;
                         } else {
                             // unknown command
                             char temp[512];

@@ -1,4 +1,5 @@
 #include <string.h>
+#include <iostream>
 
 #include "includes/virtualmachine.h"
 #include "includes/interrupt.h"
@@ -226,22 +227,24 @@ VirtualMachine::~VirtualMachine()
 bool VirtualMachine::loadProgramImage(
     const char *path, reg_t addr, reg_t swords)
 {
-    // Copy program image into main memory
-    
-    // Convert program image into bit array
-    
-    // Copy array into main memory
-    
     // Copy command line arguments onto the stack
     
     // Allocate stack space before code
     _ss = addr + (swords << 2);
     printf("%u words of stack allocated at %#x\n", swords, _ss);
+    
+    // Code segment starts right after it
     _cs = _ss + 1;
-    _ds = 0;
+    printf("Code segment begins at %#x\n", _cs);
+    
+    // Load file into memory at _cs
+    reg_t image_size = mmu->loadProgramImageFile(path, _cs, true);
+    
+    // Set data segment after code segment
+    _ds = _cs + image_size;
     
     // Report
-    printf("Code segment begins at %#x\n", _cs);
+    
     printf("Data segment begins at %#x\n", _ds);
     
     // Initialize program state
@@ -261,11 +264,11 @@ void VirtualMachine::resetSegmentRegisters()
 
 void VirtualMachine::resetGeneralRegisters()
 {
-    for (int i = 0; i < sizeof(_r); i++)
+    for (int i = 0; i < kGeneralRegisters; i++)
         _r[i] = 0;
-    for (int i = 0; i < sizeof(_fpr); i++)
+    for (int i = 0; i < kFPRegisters; i++)
         _fpr[i] = 0;
-    for (int i = 0; i < sizeof(_pq); i++)
+    for (int i = 0; i < kPQRegisters; i++)
         _pq[i] = 0;
 }
 
@@ -438,13 +441,13 @@ void VirtualMachine::eval(char *op)
     sprintf(temp+strlen(temp),  "Stack segment: %#x\n", _ss);
     sprintf(temp+strlen(temp), "General Purpose Registers:\n");
     sprintf(temp+strlen(temp),  
-        "r0 - %u\tr1 - %u\tr2 - %u\tr3 - %u\n", _r[0], _r[1], _r[2], _r[3]);
+        "r0 - %u r1 - %u r2 - %u r3 - %u\n", _r[0], _r[1], _r[2], _r[3]);
     sprintf(temp+strlen(temp),  
-        "r4 - %u\tr5 - %u\tr6 - %u\tr7 - %u\n", _r[4], _r[5], _r[6], _r[7]);
+        "r4 - %u r5 - %u r6 - %u r7 - %u\n", _r[4], _r[5], _r[6], _r[7]);
     sprintf(temp+strlen(temp),  
-        "r8 - %u\tr9 - %u\tr10 - %u\tr11 - %u\n", _r[8], _r[9], _r[10], _r[11]);
+        "r8 - %u r9 - %u r10 - %u r11 - %u\n", _r[8], _r[9], _r[10], _r[11]);
     sprintf(temp+strlen(temp),  
-        "r12 - %u\tr13 - %u\tr14 - %u\tr15 - %u\n", _r[12], _r[13], _r[14], _r[15]);
+        "r12 - %u r13 - %u r14 - %u r15 - %u\n", _r[12], _r[13], _r[14], _r[15]);
     
     response = (char *)malloc(sizeof(char) * strlen(temp) + 1);
     strcpy(response, temp);

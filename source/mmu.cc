@@ -1,6 +1,5 @@
 #include <string.h>
 #include <fstream>
-#include <iostream>
 
 #include "includes/mmu.h"
 #include "includes/virtualmachine.h"
@@ -43,7 +42,7 @@ bool MMU::init()
     return (false);
 }
 
-reg_t MMU::loadFile(const char *path, reg_t to, bool writeBreak)
+reg_t MMU::loadProgramImageFile(const char *path, reg_t to, bool writeBreak)
 {
     char buffer[256];
     std::ifstream myfile(path);

@@ -36,7 +36,7 @@ public:
     
     bool init();
     
-    reg_t loadFile(const char *path, reg_t to, bool writeBreak);
+    reg_t loadProgramImageFile(const char *path, reg_t to, bool writeBreak);
     bool writeOut(const char *path);
     
     // Operational: must return the timing

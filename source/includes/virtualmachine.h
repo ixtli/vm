@@ -15,7 +15,13 @@
 #define kMinimumMemorySize 524288 
 
 // Stack space, in words
-#define kDefaultStackSpace 5
+#define kDefaultStackSpace 6
+
+enum VMRegisterCounts {
+    kGeneralRegisters = 16,
+    kPQRegisters = 2,
+    kFPRegisters = 8
+};
 
 enum VMSizeMasks {
     kZero               = 0x0,
@@ -154,8 +160,8 @@ private:
     const char *dump_path;
     
     // registers modifiable by client
-    reg_t _r[16], _pq[2], _pc, _cs, _ds, _ss;
-    reg_t _fpsr, _fpr[8];
+    reg_t _r[kGeneralRegisters], _pq[kPQRegisters], _pc, _cs, _ds, _ss;
+    reg_t _fpsr, _fpr[kFPRegisters];
     
     // storage registers
     reg_t _ir;
