@@ -514,3 +514,7 @@ void VirtualMachine::installIntFunctions(reg_t *data, reg_t size)
     printf("%ub interrupt functions at %#x.\n", size, (reg_t)_int_table_size);
 }
 
+void VirtualMachine::shiftOffset(reg_t &offset, reg_t *val)
+{
+    alu->shiftOffset(offset, val);
+}

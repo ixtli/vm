@@ -97,12 +97,13 @@ class VirtualMachine
 public:
     VirtualMachine();
     ~VirtualMachine();
-
+    
     bool init(const char *mem_in, const char *mem_out, reg_t mem_size);
     void run(bool break_after_fex);
     void installJumpTable(reg_t *data, reg_t size);
     void installIntFunctions(reg_t *data, reg_t size);
     bool loadProgramImage(const char *path, reg_t addr, reg_t swords);
+    void shiftOffset(reg_t &offset, reg_t *val = NULL);
     
     // Helper methods that might be nice for other things...
     inline reg_t *selectRegister(char val)

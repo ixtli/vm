@@ -205,18 +205,8 @@ cycle_t MMU::singleTransfer(const STFlags *f)
     
     // Immediate means that the offset is composed of
     if (f->I == true)
-    {
         // Use the ALU barrel shifter here
-        reg_t operation = (offset & kShiftOpMask) >> 5;
-        reg_t *value = vm->selectRegister(offset & kShiftRmMask);
-        reg_t *shift = vm->selectRegister((offset & kShiftRsMask) >> 7);
-        
-        // N.B. That this differs from the ARM7500 that we've modeled
-        // the rest of this machine on, since you are required to specify
-        // a fourth register that tells you how much to shift the shift
-        // value by.
-        ALU::shift(offset, *value, *shift, operation);
-    }
+        vm->shiftOffset(offset);
     
     if (f->P)
     {

@@ -13,18 +13,16 @@ enum DataProcessingMasks {
 };
 
 enum ShifterMasks {
-    kShiftTypeMask      = 0x00000010,
-    kShiftRmMask        = 0x0000000F,
-    kShiftOpMask        = 0x00000060,
+    kShiftType          = 0x00000003,
+    kShiftOp            = 0x00000004,
+    kShiftRmMask        = 0x00000078,
     kShiftRsMask        = 0x00000380,
+    kShiftLiteral       = 0x00000380
 };
-
 
 enum MOVOpShiftMasks {
     kMOVShiftRs         = 0x000000F8,
-    kMOVShiftLiteral    = 0x000001F8,
-    kMOVShiftType       = 0x00000003,
-    kMOVShiftOp         = 0x00000004
+    kMOVLiteral         = 0x000003F8
 };
 
 enum ShiftOperations {
@@ -70,12 +68,10 @@ public:
     cycle_t dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2);
     
     // Access to the barrel shifter.
+    void shiftOffset(reg_t &offset, reg_t *value = NULL);
     static bool shift(reg_t &offset, reg_t val, reg_t shift, reg_t op);
     
 private:
-    void shiftOffset(reg_t &offset);
-    void MOVShift(reg_t &offset, reg_t *value);
-    
     VirtualMachine *_vm;
     bool _carry_out;
 };
