@@ -1,12 +1,8 @@
 TODO
 
-
 Assembler and image format for executable
 
 Interrupt table loading from file (format)
-
-Ability to step through program using frontend (-b)
-	-b <location> - when PC hits that location break and allow step
 
 Display cycles in machine state
 
@@ -22,6 +18,9 @@ Queue data structure used to represent pipeline
 	Dependance checking
 	Installing bubbles based on dependances
 	'squashing' logic in case branch happens
+
+Ability to step through program using frontend (-b)
+	-b <location> - when PC hits that location break and allow step
 
 Simple Cocoa frontend
 
