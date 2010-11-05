@@ -1,5 +1,7 @@
 Steps to build and install are currently the same.  If you're used to C/C++ development on *nix and have shell experience, use the quick directions.  If not, use the detailed ones that follow.
 
+N.B.!  The following assumes you are going to try to build YAAA-associated files with SDL.  If /not/, you may skip all steps related to SDL.
+
 ================================================================================
 Quick:
 
