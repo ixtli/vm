@@ -2,7 +2,7 @@
 solution "vm"
     configurations { "Debug", "Release" }
     buildoptions { "`sdl-config --cflags`" }
-    linkoptions { "`sdl-config --static-libs`" }
+    linkoptions { "`sdl-config --static-libs`", "-llua", "-ldl" }
     
     -- A project defines one build target
     project "vm"

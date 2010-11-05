@@ -7,6 +7,7 @@
 #include "includes/alu.h"
 #include "includes/fpu.h"
 #include "includes/util.h"
+#include "includes/luavm.h"
 
 // Macros for checking the PSR
 #define N_SET     (_psr & kPSRNBit)
@@ -212,7 +213,9 @@ cycle_t VirtualMachine::execute()
 }
 
 VirtualMachine::VirtualMachine()
-{}
+{
+    _program_file = NULL;
+}
 
 VirtualMachine::~VirtualMachine()
 {
@@ -220,8 +223,11 @@ VirtualMachine::~VirtualMachine()
     delete ms;
     
     printf("Destroying virtual machine...\n");
-    mmu->writeOut(dump_path);
+    mmu->writeOut(_dump_file);
     delete mmu;
+    
+    if (_program_file)
+        free(_program_file);
 }
 
 bool VirtualMachine::loadProgramImage(
@@ -271,8 +277,55 @@ void VirtualMachine::resetGeneralRegisters()
         _pq[i] = 0;
 }
 
-bool VirtualMachine::init(  const char *mem_in, const char *mem_out,
-                            reg_t mem_size)
+bool VirtualMachine::configure(const char *c_path)
+{
+    
+    // Parse the config file
+    LuaVM *lua = new LuaVM();
+    lua->init();
+    int ret = lua->exec(c_path, 0);
+    
+    if (ret)
+    {
+        // Something went wrong
+        fprintf(stderr, "Execution of script failed,");
+        delete lua;
+        return (true);
+    }
+    
+    // Count the errors for values that must be specified
+    int err = 0;
+    
+    // string locations
+    const char *prog_temp, *dump_temp;
+    
+    // Grab the config data from the global state of the VM post exec
+    err += lua->getGlobalUInt("memory_size", _mem_size);
+    err += lua->getGlobalUInt("read_cycles", _read_cycles);
+    err += lua->getGlobalUInt("write_cycles", _write_cycles);
+    lua->getGlobalString("program", &prog_temp);
+    lua->getGlobalString("memory_dump", &dump_temp);
+    
+    // If 
+    if (err)
+    {
+        fprintf(stderr, "A required value was not set in the config file.\n");
+        delete lua;
+        return (true);
+    }
+    
+    // Copy strings, because they wont exist after we free the lua VM
+    _program_file = (char *)malloc(sizeof(char) * strlen(prog_temp) + 1);
+    strcpy(_program_file, prog_temp);
+    _dump_file = (char *)malloc(sizeof(char) * strlen(dump_temp) + 1);
+    strcpy(_dump_file, dump_temp);
+    
+    // clean up 
+    delete lua;
+    return (false);
+}
+
+bool VirtualMachine::init()
 {
     if (pthread_mutex_init(&waiting, NULL))
     {
@@ -304,10 +357,8 @@ bool VirtualMachine::init(  const char *mem_in, const char *mem_out,
     if (fpu->init()) return (true);
     
     // Init memory
-    mmu = new MMU(this, mem_size, kMMUReadClocks, kMMUWriteClocks);
+    mmu = new MMU(this, _mem_size, _read_cycles, _write_cycles);
     if (mmu->init()) return (true);
-    
-    dump_path = mem_out;
     
     // Init cycle count
     _cycle_count = 0;
@@ -332,7 +383,7 @@ bool VirtualMachine::init(  const char *mem_in, const char *mem_out,
     // TODO: Make the OS load the program image through an interrupt
     // run(true);
     // Load program right after function table
-    loadProgramImage(mem_in, _int_table_size + _int_function_size,
+    loadProgramImage(_program_file, _int_table_size + _int_function_size,
         kDefaultStackSpace);
     
     // We can now start the Fetch EXecute cycle

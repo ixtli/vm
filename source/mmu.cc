@@ -99,7 +99,7 @@ bool MMU::writeOut(const char *path)
     printf("Dumping memory image '%s'... ", path);
     for (int i = 0; i < _memory_size; i++)
     {
-        myfile << _memory[i] << std::endl;
+        myfile << std::hex << _memory[i] << std::endl;
     }
     
     myfile.close();

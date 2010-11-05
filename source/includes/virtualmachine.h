@@ -98,7 +98,8 @@ public:
     VirtualMachine();
     ~VirtualMachine();
     
-    bool init(const char *mem_in, const char *mem_out, reg_t mem_size);
+    bool configure(const char *c_path);
+    bool init();
     void run(bool break_after_fex);
     void installJumpTable(reg_t *data, reg_t size);
     void installIntFunctions(reg_t *data, reg_t size);
@@ -158,7 +159,10 @@ private:
     FPU *fpu;
     InterruptController *icu;
     MonitorServer *ms;
-    const char *dump_path;
+    char *_program_file, *_dump_file;
+    
+    // Machine info
+    reg_t _mem_size, _read_cycles, _write_cycles;
     
     // registers modifiable by client
     reg_t _r[kGeneralRegisters], _pq[kPQRegisters], _pc, _cs, _ds, _ss;

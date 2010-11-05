@@ -1,4 +1,5 @@
 #include <signal.h>
+#include <limits.h>
 
 #include "includes/windowmanager.h"
 #include "includes/virtualmachine.h"
@@ -20,11 +21,9 @@ void sigint_handler(int sig)
 int main(int argc, char *argv[])
 {
     char c;
-    char *outpath = NULL;
-    char *inpath = NULL;
-    reg_t mem_size = kMinimumMemorySize;
+    char config_path[PATH_MAX] = "config.lua";
     
-    // Register signal
+    // Register signal handler for SIGINT
     void sigint_handler(int sig);
     struct sigaction sa;
     sa.sa_handler = sigint_handler;
@@ -37,7 +36,7 @@ int main(int argc, char *argv[])
     }
     
     // Handle command line options
-    while ((c = getopt(argc, argv, "vo:i:m:h")) != -1)
+    while ((c = getopt(argc, argv, "vc:h")) != -1)
     {
         switch (c)
         {
@@ -45,60 +44,43 @@ int main(int argc, char *argv[])
             printf("YAAA VM Version d0.0.1\n");
             exit(0);
             
-            case 'o':
-            outpath = (char *)malloc(sizeof(char)* strlen(optarg) + 1);
-            strcpy(outpath, optarg);
-            break;
-            
-            case 'i':
-            inpath = (char *)malloc(sizeof(char)* strlen(optarg) + 1);
-            strcpy(inpath, optarg);
-            break;
-            
-            case 'm':
-            mem_size = atoi(optarg);
-            if (mem_size < kMinimumMemorySize)
-            {
-                printf("Memory size argument less than minimum.  Defaults.\n");
-                mem_size = kMinimumMemorySize;
-            }
+            case 'c':
+            strcpy(config_path, optarg);
             break;
             
             case 'h':
             printf("YAAA VM Help:\n");
             printf("v\t\t\tPrint version string.\n");
-            printf("o [path]\t\tPrint memory to file.\n");
-            printf("i [path]\t\tRead memory in from file.\n");
-            printf("m [Uint32]\t\tMachine memory size in kilobytes.\n");
+            printf("c <path>\t\tPath to the lua configuration file.\n");
             exit(0);
             
             default:
             break;
         }
     }
-    // Create the wm object and init it
-    //WindowManager::Create();
-    //wm->Init(640, 480);
     
     // Now that we've intialized our environment, start the machine
     vm = new VirtualMachine();
     
+    // Configure the VM using the config file
+    if (vm->configure(config_path))
+    {
+        fprintf(stderr, "VM configuration failed, aborting.\n");
+        exit(2);
+    }
+    
     // Init the VM
-    if (vm->init(inpath, outpath, mem_size))
+    if (vm->init())
     {
         // We found a problem.
+        fprintf(stderr, "VM init failed, aborting.\n");
         exit(1);
     }
     
-    // Run the VM
+    // Run the VM and don't return after Fetch EXecute
     vm->run(false);
     
     // Clean up and exit
     delete vm;
-    //WindowManager::Destroy();
-    if (inpath)
-        free(inpath);
-    if (outpath)
-        free(outpath);
-    return 0;
+    return (0);
 }
