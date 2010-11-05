@@ -19,8 +19,6 @@
 #define Z_SET     (_psr & kPSRZBit)
 #define Z_CLEAR  !(_psr & kPSRZBit)
 
-VirtualMachine *vm = NULL;
-
 bool VirtualMachine::evaluateConditional()
 {
     // Evaluate the condition code in the IR
@@ -230,14 +228,13 @@ VirtualMachine::~VirtualMachine()
         free(_program_file);
 }
 
-bool VirtualMachine::loadProgramImage(
-    const char *path, reg_t addr, reg_t swords)
+bool VirtualMachine::loadProgramImage(const char *path, reg_t addr)
 {
     // Copy command line arguments onto the stack
     
     // Allocate stack space before code
-    _ss = addr + (swords << 2);
-    printf("%u words of stack allocated at %#x\n", swords, _ss);
+    _ss = addr + (_stack_size << 2);
+    printf("%u words of stack allocated at %#x\n", _stack_size, _ss);
     
     // Code segment starts right after it
     _cs = _ss + 1;
@@ -303,6 +300,9 @@ bool VirtualMachine::configure(const char *c_path)
     err += lua->getGlobalUInt("memory_size", _mem_size);
     err += lua->getGlobalUInt("read_cycles", _read_cycles);
     err += lua->getGlobalUInt("write_cycles", _write_cycles);
+    
+    // Optional arguments
+    lua->getGlobalUInt("stack_size", _stack_size);
     lua->getGlobalString("program", &prog_temp);
     lua->getGlobalString("memory_dump", &dump_temp);
     
@@ -338,7 +338,7 @@ bool VirtualMachine::init()
     
     // Initialize command and status server
     printf("Initializing server... \n");
-    ms = new MonitorServer();
+    ms = new MonitorServer(this);
     if (ms->init())
         return (true);
     if (ms->run())
@@ -383,8 +383,7 @@ bool VirtualMachine::init()
     // TODO: Make the OS load the program image through an interrupt
     // run(true);
     // Load program right after function table
-    loadProgramImage(_program_file, _int_table_size + _int_function_size,
-        kDefaultStackSpace);
+    loadProgramImage(_program_file, _int_table_size + _int_function_size);
     
     // We can now start the Fetch EXecute cycle
     fex = true;

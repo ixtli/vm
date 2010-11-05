@@ -195,9 +195,9 @@ void MMU::abort(reg_t &location)
 cycle_t MMU::singleTransfer(const STFlags *f)
 {
     // The base register is where the address comes from
-    reg_t *base = vm->selectRegister(f->rs);
+    reg_t *base = _vm->selectRegister(f->rs);
     // The dest register is where the value comes from
-    reg_t *dest = vm->selectRegister(f->rd);
+    reg_t *dest = _vm->selectRegister(f->rd);
     // The offset modifies the base register
     reg_t offset = f->offset;
     
@@ -206,7 +206,7 @@ cycle_t MMU::singleTransfer(const STFlags *f)
     // Immediate means that the offset is composed of
     if (f->I == true)
         // Use the ALU barrel shifter here
-        vm->shiftOffset(offset);
+        _vm->shiftOffset(offset);
     
     if (f->P)
     {

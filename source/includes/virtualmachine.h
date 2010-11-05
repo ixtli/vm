@@ -12,10 +12,7 @@
 #define kExecCommand    "EXEC"
 
 // Memory constants, in bytes
-#define kMinimumMemorySize 524288 
-
-// Stack space, in words
-#define kDefaultStackSpace 6
+#define kMinimumMemorySize 524288
 
 enum VMRegisterCounts {
     kGeneralRegisters = 16,
@@ -103,7 +100,7 @@ public:
     void run(bool break_after_fex);
     void installJumpTable(reg_t *data, reg_t size);
     void installIntFunctions(reg_t *data, reg_t size);
-    bool loadProgramImage(const char *path, reg_t addr, reg_t swords);
+    bool loadProgramImage(const char *path, reg_t addr);
     void shiftOffset(reg_t &offset, reg_t *val = NULL);
     
     // Helper methods that might be nice for other things...
@@ -140,9 +137,6 @@ public:
     reg_t _psr;
     bool supervisor, fex;
     
-    // SIGINT flips this to tell everything to turn off
-    volatile sig_atomic_t terminate;
-    
     pthread_mutex_t waiting;
     // The following are READ/WRITE LOCKED by 'waiting'
     char *operation, *response;
@@ -154,15 +148,20 @@ private:
     cycle_t execute();
     void eval(char *op);
     
+    // Units
     MMU *mmu;
     ALU *alu;
     FPU *fpu;
     InterruptController *icu;
+    
+    // Server
     MonitorServer *ms;
+    
+    // VM state
     char *_program_file, *_dump_file;
     
     // Machine info
-    reg_t _mem_size, _read_cycles, _write_cycles;
+    reg_t _mem_size, _read_cycles, _write_cycles, _stack_size;
     
     // registers modifiable by client
     reg_t _r[kGeneralRegisters], _pq[kPQRegisters], _pc, _cs, _ds, _ss;
@@ -178,7 +177,11 @@ private:
     cycle_t _cycle_count;
 };
 
-// Main VM context
-extern VirtualMachine *vm;
+// SIGINT flips this to tell everything to turn off
+// Must have it declared extern and at file scope so that we can
+// read it form anywhere, which is assumed safe because of it's type.
+extern "C" {
+extern volatile sig_atomic_t terminate;
+}
 
 #endif

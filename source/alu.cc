@@ -2,14 +2,14 @@
 #include "includes/alu.h"
 
 // Macros for checking the PSR
-#define N_SET     (vm->_psr & kPSRNBit)
-#define N_CLEAR  !(vm->_psr & kPSRNBit)
-#define V_SET     (vm->_psr & kPSRVBit)
-#define V_CLEAR  !(vm->_psr & kPSRVBit)
-#define C_SET     (vm->_psr & kPSRCBit)
-#define C_CLEAR  !(vm->_psr & kPSRCBit)
-#define Z_SET     (vm->_psr & kPSRZBit)
-#define Z_CLEAR  !(vm->_psr & kPSRZBit)
+#define N_SET     (_vm->_psr & kPSRNBit)
+#define N_CLEAR  !(_vm->_psr & kPSRNBit)
+#define V_SET     (_vm->_psr & kPSRVBit)
+#define V_CLEAR  !(_vm->_psr & kPSRVBit)
+#define C_SET     (_vm->_psr & kPSRCBit)
+#define C_CLEAR  !(_vm->_psr & kPSRCBit)
+#define Z_SET     (_vm->_psr & kPSRZBit)
+#define Z_CLEAR  !(_vm->_psr & kPSRZBit)
 
 ALU::ALU(VirtualMachine *vm) : _vm(vm)
 {}
@@ -22,7 +22,7 @@ ALU::~ALU()
 bool ALU::init()
 {
     // Return true if instantiation failed
-    if (!vm) return (true);
+    if (!_vm) return (true);
     
     _carry_out = false;
     return (false);
@@ -93,17 +93,17 @@ void ALU::shiftOffset(reg_t &offset, reg_t *val)
         
         if (offset & kShiftType)
             // Shifting a value in a register
-            shift = *(vm->selectRegister((offset & kMOVShiftRs) >> 3));
+            shift = *(_vm->selectRegister((offset & kMOVShiftRs) >> 3));
         else
             // Shifting an immediate
             shift = (offset & kMOVLiteral) >> 3;
     } else {
         // This is the standard case, get embedded val
-        value = vm->selectRegister((offset & kShiftRmMask) >> 3);
+        value = _vm->selectRegister((offset & kShiftRmMask) >> 3);
         
         if (offset & kShiftType)
             // We're shifting by the value in a register
-            shift = *(vm->selectRegister((offset & kShiftRsMask) >> 7));
+            shift = *(_vm->selectRegister((offset & kShiftRsMask) >> 7));
         else
             // We're only shifting by an immediate amount
             shift = (offset & kShiftRsMask) >> 7;
@@ -117,9 +117,9 @@ void ALU::shiftOffset(reg_t &offset, reg_t *val)
     }
     
     if (ALU::shift(offset, *value, shift, operation))
-        vm->_psr = C_SET;
+        _vm->_psr = C_SET;
     else
-        vm->_psr = C_CLEAR;
+        _vm->_psr = C_CLEAR;
     
     return;
 }
@@ -131,7 +131,7 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
     bool arithmetic = true;
     bool commit = true;
     reg_t dest;
-    reg_t *source = vm->selectRegister(s);
+    reg_t *source = _vm->selectRegister(s);
     
     switch (op)
     {
@@ -261,7 +261,7 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
     //       confusion when you branch or something.
     
     // Reset status bits that are effected
-    vm->_psr &= ~NVCZ_MASK;
+    _vm->_psr &= ~NVCZ_MASK;
     
     // Set status bits
     // There are two cases, logical and arithmetic
@@ -278,11 +278,10 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
                     V_SET;
                 else
                     V_CLEAR;
-            
+                
                 // Also, set the negative bit
                 N_SET;
             } else {
-            
                 // Z flag set if dest is zero
                 if (dest == 0x0) {
                     Z_SET;
@@ -292,7 +291,7 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
                         C_SET;
                     else
                         C_CLEAR;
-                
+                    
                     Z_CLEAR;
                 }
             }
@@ -300,25 +299,25 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
         } else {
             // We're a logical operation
             // C flag is set to the carry out of the shifter, so do nothing.
-        
+            
             // Z flag is set if result is all zeros
             if (dest == 0x0)
                 Z_SET;
             else
                 Z_CLEAR;
-        
+            
             // N flag is set to the logical value of bit 31 of the result
             if (dest & kMSBMask)
                 N_SET;
             else
                 N_CLEAR;
-        
+            
             // (V Flag is uneffected by logical operations)
         }
     }
     
     if (commit)
-        *(vm->selectRegister(d)) = dest;
+        *(_vm->selectRegister(d)) = dest;
     
     return (cycles);
 }

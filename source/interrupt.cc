@@ -20,7 +20,7 @@ InterruptController::~InterruptController()
 bool InterruptController::init()
 {
     // Return true if instantiation failed
-    if (!vm) return (true);
+    if (!_vm) return (true);
     
     _vm->installJumpTable(jump_table, sizeof(jump_table));
     _vm->installIntFunctions(functions, sizeof(functions));
@@ -31,7 +31,7 @@ bool InterruptController::init()
 size_t InterruptController::swint(reg_t comment)
 {
     // There are two possible interpretations of the comments field
-    if (!vm->supervisor)
+    if (!_vm->supervisor)
     {
         // If user-mode code called this then we treat the comment
         // as an offset into the interrupt table.
@@ -44,10 +44,10 @@ size_t InterruptController::swint(reg_t comment)
         }
         
         // Move the program counter to the start of the jump function
-        *(vm->selectRegister(kPCCode)) = sizeof(jump_table)+jump_table[comment];
+        *(_vm->selectRegister(kPCCode)) = sizeof(jump_table)+jump_table[comment];
         
         // We're entering supervisor mode
-        vm->supervisor = true;
+        _vm->supervisor = true;
         return(kSWIntUserMode);
     }
     
@@ -62,14 +62,14 @@ size_t InterruptController::swint(reg_t comment)
         // Treat this as BREAK, which should stop the FEX and allow the server
         // to query the state of the machine
         printf("Hardware Interrupt: BREAK\n");
-        vm->fex = false;
+        _vm->fex = false;
         break;
         
         case 0xFF:
         // This is the return function, which sets PC to r15
         // and turns off supervisor mode
-        *(vm->selectRegister(kPCCode)) = *(vm->selectRegister(kR15Code));
-        vm->supervisor = false;
+        *(_vm->selectRegister(kPCCode)) = *(_vm->selectRegister(kR15Code));
+        _vm->supervisor = false;
         break;
         
         default:

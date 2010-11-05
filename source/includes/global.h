@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <pthread.h>
 
 // Keep this list even sparser :P
 #define DISALLOW_COPY_AND_ASSIGN(TypeName)\

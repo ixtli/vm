@@ -6,7 +6,7 @@ memory_dump = "memory.dump"
 
 -- Memory size in bytes
 memory_size = 1024
-
+stack_size = 32
 
 -- Instruction timings
 

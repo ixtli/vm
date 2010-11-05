@@ -1,10 +1,7 @@
 #ifndef _SERVER_H_
 #define _SERVER_H_
 
-#include <pthread.h>
-
 #include "global.h"
-#include "virtualmachine.h"
 
 // port to listen on
 #define PORT "1337"
@@ -22,17 +19,19 @@
 #define kServerHangingUp        "300"
 #define kWaitingForRequests     "400"
 
-#define kUnknownCommandMSG      "Unknown command."
+// Forward class definitions
+class VirtualMachine;
 
 class MonitorServer
 {
 public:
-    MonitorServer();
+    MonitorServer(VirtualMachine *vm);
     ~MonitorServer();
     
     bool init();
     int run();
 private:
+    VirtualMachine *_vm;
 };
 
 #endif

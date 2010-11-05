@@ -15,14 +15,9 @@ solution "vm"
             flags { "Symbols" }
             files { "main.cc" }
         
+        configuration "SDL"
+        
         configuration "Release"
             defines { "NDEBUG" }
             flags { "Optimize" }
     
-    project "test"
-        kind "ConsoleApp"
-        language "C++"
-        files { "*.cc", "tests/*.cc" }
-        excludes { "main.cc" }
-        defines { "DEBUG" }
-        flags { "Symbols" }

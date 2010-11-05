@@ -7,34 +7,34 @@
 #include <arpa/inet.h>
 #include <sys/wait.h>
 #include <signal.h>
-#include <pthread.h>
 
 #include "includes/server.h"
-
-void *serve( void *ptr );
+#include "includes/virtualmachine.h"
 
 pthread_t _listener;
+void *serve( void *ptr );
 
-MonitorServer::MonitorServer()
+MonitorServer::MonitorServer(VirtualMachine *vm) : _vm(vm)
 { }
 
 MonitorServer::~MonitorServer()
 {
     printf("Waiting for listener thread to terminate... ");
-    vm->terminate = true;
+    terminate = 1;
     pthread_join(_listener, NULL);
     printf("Done.\n");
 }
 
 bool MonitorServer::init()
 {
+    if (!_vm) return (true);
     return (false);
 }
 
 int MonitorServer::run()
 {
     // spawn a listener thread
-    int ret = pthread_create( &_listener, NULL, serve, NULL);
+    int ret = pthread_create(&_listener, NULL, serve, (void *)_vm);
     return (ret);
 }
 
@@ -51,6 +51,14 @@ void *get_in_addr(struct sockaddr *sa)
 void *serve( void *ptr )
 {
     printf("Monitor connection listener thread started.\n");
+    
+    // Find out what machine we're dealing with
+    VirtualMachine *vm = (VirtualMachine *)ptr;
+    if (!vm)
+    {
+        fprintf(stderr, "No virtual machine instance.  Aborting.\n");
+        return (NULL);
+    }
     
     fd_set master;      // Master fd descr list
     fd_set read_fds;    // temp fd for select()
@@ -139,7 +147,7 @@ void *serve( void *ptr )
     // something to do
     pthread_mutex_lock(&vm->waiting);
     
-    while(!vm->terminate)
+    while(!terminate)
     {
         // copy master fds
         read_fds = master;

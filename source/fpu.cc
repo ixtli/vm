@@ -12,7 +12,7 @@ FPU::~FPU()
 bool FPU::init()
 {
     // Return true if instantiation failed
-    if (!vm) return (true);
+    if (!_vm) return (true);
     return (false);
 }
 
@@ -22,10 +22,10 @@ cycle_t FPU::execute(char op, reg_t &fps, reg_t &fpd, reg_t &fpn, reg_t &fpm)
     cycle_t cycles = 0;
     bool shift_carry = false;
     bool arithmetic = false;
-    reg_t *_fps = vm->selectRegister(fps);
-    reg_t *_fpd = vm->selectRegister(fpd);
-    reg_t *_fpn = vm->selectRegister(fpn);
-    reg_t *_fpm = vm->selectRegister(fpm);
+    reg_t *_fps = _vm->selectRegister(fps);
+    reg_t *_fpd = _vm->selectRegister(fpd);
+    reg_t *_fpn = _vm->selectRegister(fpn);
+    reg_t *_fpm = _vm->selectRegister(fpm);
     
   //  printf("%u %u %u %u", *_fps, *_fpd, *_fpn, *_fpm);
 
