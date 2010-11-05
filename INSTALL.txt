@@ -1,16 +1,20 @@
 Steps to build and install are currently the same.  If you're used to C/C++ development on *nix and have shell experience, use the quick directions.  If not, use the detailed ones that follow.
 
+================================================================================
 Quick:
+
  - Make sure your environment is sane. (Read: POSIX compliant.)
  - Make sure you have the GCC installed.
  - Install libSDL 1.2.x.
  - Install premake4.
+ - Install lua 5.1.x
  - From this directory, `cd ./source`
  - Run premake4 in a way similar to `premake4 --cc=gcc --file=premake4.lua --os=macosx gmake`
  - Build by doing `make`.
 
  - Optionally make a shell script in the source dir that has your premake4 command automated in a file called 'pm.sh', as this is already added to the .gitignore
 
+================================================================================
 Detailed:
 
 Before attempting to install be sure you are operating in an environment that attempts POSIX compliance.  This means that you can use GCC to emit a binary and run it.
@@ -20,6 +24,10 @@ Following this, install SDL 1.2.X, which can be obtained for most any platform h
 With this completed be sure that SDL_main.h is somewhere where GCC will be able to find it.  After you are sure of this install the most recent version of the tool premake for your platform.  It can be found here: http://industriousone.com/premake/download
 
 Be sure that you premake4 has been properly installed and added to your PATH by ensuring that `premake4 --version` produces a favorable result.
+
+The last required dependency is lua, which is arguably easiest of them all.  Simply download any version of lua greater than or equal to 5.1 here:
+http://www.lua.org/versions.html
+Follow the very simple install instructions in the INSTALL file that comes in that gzipped tar, which should consist of two commands: `make <target arch> && sudo make install`.
 
 Now that our environment is ready, change to the 'source' directory, which should already exist in the same directory as this text file.  Execute `premake4 --cc=gcc --file=premake4.lua --os=<YOUR_OS> gmake`, where YOUR_OS is whatever value suits your environment.  Ideally bsd, linux, or macosx.  More information on acceptable parameters to premake can be obtained easily by executing `premake4 --help`.
 
