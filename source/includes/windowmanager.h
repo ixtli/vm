@@ -15,7 +15,4 @@ public:
     virtual bool PollEventQueue() = 0;
 };
 
-// Main interface to windowmanager
-extern WindowManager *wm;
-
 #endif

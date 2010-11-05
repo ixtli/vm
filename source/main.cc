@@ -1,10 +1,8 @@
 #include <signal.h>
 #include <limits.h>
+#include <string.h>
 
-#include "includes/windowmanager.h"
 #include "includes/virtualmachine.h"
-
-#include "SDL_main.h"
 
 // SIGINT flips this to tell everything to turn off
 // Must have it declared extern and at file scope so that we can
@@ -12,10 +10,15 @@
 // otherwise it will not be mangled properly and link will fail.
 volatile sig_atomic_t terminate;
 
-// The SDL_main.h installed for OS X says that the following
-// needs to be present.  I wont argue.
-#ifdef __cplusplus
-extern "C"
+// Probably won't be using SDL in the server, but if we are ...
+#ifdef USE_SDL
+    #include "includes/windowmanager.h"
+    #include "SDL_main.h"
+    // The SDL_main.h installed for OS X says that the following
+    // needs to be present.  I wont argue.
+    #ifdef __cplusplus
+        extern "C"
+    #endif
 #endif
 
 #define kDefaultConfigPath "config.lua"
