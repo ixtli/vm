@@ -4,13 +4,9 @@ Assembler and image format for executable
 
 Interrupt table loading from file (format)
 
-Display cycles in machine state
-
 Lua scripting
 	timing
 	machine configuration (memory, pipes, stack, etc..) 
-	program image file 
-	memory write out file
 	interrupt table file
 
 Queue data structure used to represent pipeline

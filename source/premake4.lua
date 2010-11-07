@@ -1,7 +1,8 @@
 -- A solution contains projects, and defines the available configurations
 solution "vm"
     configurations { "Debug", "Release", "SDL" }
-    linkoptions { "-llua", "-ldl" }
+    buildoptions { "-pthread" }
+    linkoptions { "-lpthread", "-llua", "-ldl" }
     
     -- A project defines one build target
     project "vm"

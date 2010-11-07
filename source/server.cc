@@ -1,3 +1,6 @@
+#include <pthread.h>
+#include <errno.h>
+
 #include <string.h>
 #include <sys/types.h>
 #include <sys/time.h>
@@ -11,7 +14,19 @@
 #include "includes/server.h"
 #include "includes/virtualmachine.h"
 
+// The following should only ever be changed to true by the serve thread.
+// It is used to tell the VM thread that all init has occured properly and
+// the server has aquired the work lock.  This mechanism is here in case
+// the VM finishes doing all of it's work before the thread even gets to lock.
+// Remember that from starting the thread and doing all the socket work, the
+// server thread is making a ton of really slow syscalls.
+bool _ready = false;
+
+// Define this here so we don't have to put #include <pthread.h> in the server
+// header file
 pthread_t _listener;
+
+// Have to forward declare the function to be passed to pthread_create
 void *serve( void *ptr );
 
 MonitorServer::MonitorServer(VirtualMachine *vm) : _vm(vm)
@@ -28,13 +43,31 @@ MonitorServer::~MonitorServer()
 bool MonitorServer::init()
 {
     if (!_vm) return (true);
+    _ready = false;
     return (false);
+}
+
+bool MonitorServer::isRunning()
+{
+    if (pthread_kill(_listener, 0) == ESRCH)
+        return (false);
+    else
+        return (true);
+}
+
+bool MonitorServer::ready()
+{
+    return (_ready);
 }
 
 int MonitorServer::run()
 {
-    // spawn a listener thread
-    int ret = pthread_create(&_listener, NULL, serve, (void *)_vm);
+    // spawn the listener thread, explicitly joinable.
+    pthread_attr_t attr;
+    int ret = pthread_attr_init(&attr);
+    ret = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+    ret = pthread_create(&_listener, &attr, serve, (void *)_vm);
+    
     return (ret);
 }
 
@@ -81,7 +114,7 @@ void *serve( void *ptr )
     
     // timing for the select
     struct timeval tv;
-    tv.tv_usec = 500000; // every .5 seconds check for termination call
+    tv.tv_usec = 100000; // every .1 seconds check for termination call
     
     // Clear the master and temp sets
     FD_ZERO(&master);
@@ -143,9 +176,23 @@ void *serve( void *ptr )
     // keep track of the biggest file desriptor
     fdmax = listener;
     
-    // Take the lock so the vm goes to sleep while we wait for
-    // something to do
-    pthread_mutex_lock(&vm->waiting);
+    // We must have the lock, otherwise it'll cause VM thread to deadlock
+    // HOWEVER, nothing should have the lock at this point so if there is
+    // contention, make sure to fail hard to avoid race conditions.
+    int err = pthread_mutex_trylock(&server_mutex);
+    if (err)
+    {
+        // Something has the mutex, die.
+        fprintf(stderr, "Server could not get the mutex: %s\n", strerror(err));
+        return (NULL);
+    }
+    
+    // From now on, ANY return must free the mutex.  Do NOT assume that there
+    // will be an exit() call when this thread dies.
+    
+    // Tell VM thread that we're ready.  This basically tells them we've
+    // aquired the mutex and blocking on it wont cause a race condition.
+    _ready = true;
     
     while(!terminate)
     {
@@ -154,6 +201,7 @@ void *serve( void *ptr )
         if (select(fdmax+1, &read_fds, NULL, NULL, &tv) == -1)
         {
             perror("select");
+            pthread_mutex_unlock(&server_mutex);
             return (NULL);
         }
         
@@ -207,10 +255,10 @@ void *serve( void *ptr )
                         vm->operation = buf;
                         vm->opsize = sizeof(buf);
                         // give the vm a chance to work
-                        pthread_mutex_unlock(&vm->waiting);
+                        pthread_mutex_unlock(&server_mutex);
                         // try to get it back by waiting again
                         // (enter the queue)
-                        pthread_mutex_lock(&vm->waiting);
+                        pthread_mutex_lock(&server_mutex);
                         if (vm->respsize > 0)
                         {
                             send(i, vm->response, vm->respsize, 0);
@@ -229,6 +277,7 @@ void *serve( void *ptr )
     }
     
     printf("Shutting down listener.\n");
-    pthread_mutex_unlock(&vm->waiting);
+    pthread_mutex_unlock(&server_mutex);
+    return (NULL);
 }
 

@@ -30,6 +30,10 @@ public:
     
     bool init();
     int run();
+    
+    bool isRunning();
+    bool ready();
+    
 private:
     VirtualMachine *_vm;
 };

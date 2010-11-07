@@ -1,7 +1,12 @@
+#include <pthread.h>
+#include <errno.h>>
+
+#include <signal.h>
 #include <string.h>
 #include <iostream>
 
 #include "includes/virtualmachine.h"
+#include "includes/server.h"
 #include "includes/interrupt.h"
 #include "includes/mmu.h"
 #include "includes/alu.h"
@@ -18,6 +23,17 @@
 #define C_CLEAR  !(_psr & kPSRCBit)
 #define Z_SET     (_psr & kPSRZBit)
 #define Z_CLEAR  !(_psr & kPSRZBit)
+
+// SIGINT flips this to tell everything to turn off
+// Must have it declared extern and at file scope so that we can
+// read it form anywhere.  Also, it must be outside of the extern "C" block
+// otherwise it will not be mangled properly and link will fail.
+extern "C" {
+    volatile sig_atomic_t terminate;
+}
+
+// Init static mutex
+pthread_mutex_t server_mutex;
 
 bool VirtualMachine::evaluateConditional()
 {
@@ -327,14 +343,8 @@ bool VirtualMachine::configure(const char *c_path)
 
 bool VirtualMachine::init()
 {
-    if (pthread_mutex_init(&waiting, NULL))
-    {
-        printf("Can't init mutex.\n");
-        return (true);
-    }
-    
-    // Initialize virtual machine constructs here
-    terminate = 0;
+    // Initialize server_mutex for MonitorServer
+    pthread_mutex_init(&server_mutex, NULL);
     
     // Initialize command and status server
     printf("Initializing server... \n");
@@ -531,12 +541,22 @@ void VirtualMachine::run(bool break_after_fex)
         _cycle_count += execute();
     }
     
+    // Should we bother to wait for server commands?
     if (break_after_fex) return;
+    
+    // Is the server even running?
+    if (!ms->isRunning()) return;
+    
+    // Busy wait for the other thread to initialize and aquire the lock before
+    // we go tosleep on it.  If we get this lock before the other thread starts
+    // and begins listening, it will cause a deadlock.
+    while (!ms->ready())
+    { }
     
     while (!terminate)
     {
         // Wait for something to happen
-        pthread_mutex_lock(&waiting);
+        pthread_mutex_lock(&server_mutex);
         if (terminate)
             continue;
         
@@ -545,7 +565,7 @@ void VirtualMachine::run(bool break_after_fex)
         eval(operation);
         
         // we're done
-        pthread_mutex_unlock(&waiting);
+        pthread_mutex_unlock(&server_mutex);
     }
     
     printf("Exiting...\n");

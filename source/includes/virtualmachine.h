@@ -1,10 +1,9 @@
 #ifndef _VIRTUALMACHINE_H_
 #define _VIRTUALMACHINE_H_
 
-#include <signal.h>
+#include <pthread.h>
 
 #include "global.h"
-#include "server.h"
 
 #define kWriteCommand   "WRITE"
 #define kReadCommand    "READ"
@@ -137,10 +136,10 @@ public:
     reg_t _psr;
     bool supervisor, fex;
     
-    pthread_mutex_t waiting;
-    // The following are READ/WRITE LOCKED by 'waiting'
+    // The following should be READ/WRITE LOCKED by 'server_mutex'
     char *operation, *response;
     size_t opsize, respsize;
+    //////////////////////////////////////////////////////////////
 private:
     void resetSegmentRegisters();
     void resetGeneralRegisters();
@@ -181,7 +180,9 @@ private:
 // Must have it declared extern and at file scope so that we can
 // read it form anywhere, which is assumed safe because of it's type.
 extern "C" {
-extern volatile sig_atomic_t terminate;
+    extern volatile sig_atomic_t terminate;
 }
+
+extern pthread_mutex_t server_mutex;
 
 #endif
