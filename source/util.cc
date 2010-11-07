@@ -1,4 +1,5 @@
 #include <string.h>
+
 #include "includes/util.h"
 
 unsigned int _binary_to_int(const char *str)

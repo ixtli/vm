@@ -1,11 +1,10 @@
-#include <pthread.h>
-#include <errno.h>>
+#include "includes/virtualmachine.h"
 
+#include <errno.h>>
 #include <signal.h>
 #include <string.h>
 #include <iostream>
 
-#include "includes/virtualmachine.h"
 #include "includes/server.h"
 #include "includes/interrupt.h"
 #include "includes/mmu.h"

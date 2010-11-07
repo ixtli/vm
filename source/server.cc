@@ -1,6 +1,7 @@
-#include <pthread.h>
-#include <errno.h>
+#include "includes/virtualmachine.h"
 
+#include <errno.h>
+#include <unistd.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/time.h>
@@ -12,7 +13,6 @@
 #include <signal.h>
 
 #include "includes/server.h"
-#include "includes/virtualmachine.h"
 
 // The following should only ever be changed to true by the serve thread.
 // It is used to tell the VM thread that all init has occured properly and

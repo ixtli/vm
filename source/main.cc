@@ -1,6 +1,7 @@
 #include <signal.h>
 #include <limits.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "includes/virtualmachine.h"
 
