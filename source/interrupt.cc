@@ -1,6 +1,8 @@
 #include "includes/virtualmachine.h"
 #include "includes/interrupt.h"
 
+#define kDefaultSWIntCycles     10
+
 #define kBREAK_INSTRUCTION      0xEF00000F
 #define kRETURN_INSTRUCTION     0xEF0000FF
 
@@ -9,7 +11,8 @@ reg_t functions[] = {       kBREAK_INSTRUCTION          ,
                             kRETURN_INSTRUCTION
                                                         };
 
-InterruptController::InterruptController(VirtualMachine *vm) : _vm(vm)
+InterruptController::InterruptController(VirtualMachine *vm, cycle_t timing) :
+    _vm(vm), _swint_cycles(timing)
 {}
 
 InterruptController::~InterruptController()
@@ -22,13 +25,15 @@ bool InterruptController::init()
     // Return true if instantiation failed
     if (!_vm) return (true);
     
+    if (!_swint_cycles) _swint_cycles = kDefaultSWIntCycles;
+    
     _vm->installJumpTable(jump_table, sizeof(jump_table));
     _vm->installIntFunctions(functions, sizeof(functions));
     
     return (false);
 }
 
-size_t InterruptController::swint(reg_t comment)
+cycle_t InterruptController::swint(reg_t comment)
 {
     // There are two possible interpretations of the comments field
     if (!_vm->supervisor)
@@ -48,13 +53,13 @@ size_t InterruptController::swint(reg_t comment)
         
         // We're entering supervisor mode
         _vm->supervisor = true;
-        return(kSWIntUserMode);
+        return(_swint_cycles);
     }
     
     // otherwise we're in supervisor mode and the vm is trying to talk to
     // the host machine's hardware.  We use the 'ret' value to simulate
     // the time it takes to do one of these hardware interrupts
-    size_t ret = 0;
+    size_t ret = 1;
     
     switch (comment)
     {

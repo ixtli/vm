@@ -23,10 +23,12 @@
 #define Z_SET     (_psr & kPSRZBit)
 #define Z_CLEAR  !(_psr & kPSRZBit)
 
+#define kDefaultBranchCycles    5
+
 // SIGINT flips this to tell everything to turn off
 // Must have it declared extern and at file scope so that we can
-// read it form anywhere.  Also, it must be outside of the extern "C" block
-// otherwise it will not be mangled properly and link will fail.
+// read it form anywhere.  Also it needs to be extern C because it's
+// going to be referenced from within a syscal?  Maybe?
 extern "C" {
     volatile sig_atomic_t terminate;
 }
@@ -181,12 +183,18 @@ cycle_t VirtualMachine::execute()
             reg_t op2 = ( (_ir & kDPOperandTwoMask) );
             return (alu->dataProcessing(I, S, op, source, dest, op2));
         }
-    } else if (_ir & kBranchMask == 0x0) {
+    }
+    
+    if ((_ir & kBranchMask) == 0x0) {
+        
+        // We could be trying to execute something in reserved instruction
+        // space.  If so, deny the request.
         if (_ir & kReservedSpaceMask == 0x0)
         {
-            fprintf(stderr, "Attempt to execute a reserved operation.\n");
+            fprintf(stderr, "CPU TRAP: Execute reserved fxn: %#x\n", _ir);
             return (cycles);
         }
+        
         // We're a branch
         if (_ir & kBranchLBitMask)
             // Store current pc in the link register (r15)
@@ -201,6 +209,9 @@ cycle_t VirtualMachine::execute()
         struct {signed int x:25;} s;
         signed int addr = s.x = temp;
         
+        if (_print_branch_offset)
+            printf("BRANCH: %i\n", addr);
+        
         // Add the computed address to the pc and make sure it's not negative
         addr += (signed int)_pc;
         if (addr < 0)
@@ -209,7 +220,9 @@ cycle_t VirtualMachine::execute()
             _pc = addr;
         
         return (cycles);
-    } else if (_ir & kFloatingPointMask == 0x0) {
+    }
+    
+    if ((_ir & kFloatingPointMask) == 0x0) {
         // We're a floating point operation
         char op = ((_ir & kFPOpcodeMask) >> 20);
         char fps = ((_ir & kFPsMask) >> 17);
@@ -217,12 +230,12 @@ cycle_t VirtualMachine::execute()
         char fpn = ((_ir & kFPnMask) >> 11);
         char fpm = ((_ir & kFPmMask) >> 8);
         return (fpu->execute(op, _fpr[fps], _fpr[fpd], _fpr[fpn], _fpr[fpm]));
-    } else {
-        // We're a SW interrupt
-        // pc is always saved in r15 before branching
-        _r[15] = _pc;
-        return (icu->swint(_ir & kSWIntCommentMask));
     }
+    
+    // We're a SW interrupt
+    // pc is always saved in r15 before branching
+    _r[15] = _pc;
+    return (icu->swint(_ir & kSWIntCommentMask));
 }
 
 VirtualMachine::VirtualMachine()
@@ -318,8 +331,14 @@ bool VirtualMachine::configure(const char *c_path, ALUTimings &at)
     
     // Optional arguments
     lua->getGlobalField("stack_size", kLUInt, &_stack_size);
+    lua->getGlobalField("swint_cycles", kLUInt, &_swint_cycles);
+    lua->getGlobalField("branch_cycles", kLUInt, &_branch_cycles);
     lua->getGlobalField("program", kLString, &prog_temp);
     lua->getGlobalField("memory_dump", kLString, &dump_temp);
+    lua->getGlobalField("print_instruction", kLBool, &_print_instruction);
+    lua->getGlobalField("print_branch_offset", kLBool, &_print_branch_offset);
+    lua->getGlobalField("program_length_trap", kLUInt, &_length_trap);
+    lua->getGlobalField("machine_cycle_trap", kLUInt, &_cycle_trap);
     
     // Deal with ALU timings
     if (lua->openGlobalTable("alu_timings") != kLuaUnexpectedType)
@@ -327,8 +346,6 @@ bool VirtualMachine::configure(const char *c_path, ALUTimings &at)
         // User defined the table, so pull all the ops out of it
         for (int i = 0; i < kDPOpcodeCount; i++)
             lua->getTableField(DPOpMnumonics[i], kLUInt, (void *) &at.op[i]);
-        
-        printf("ALU Op '%s' set to %lu\n", DPOpMnumonics[kMUL], at.op[kMUL]);
         
         // Clean up
         lua->closeTable();
@@ -355,10 +372,15 @@ bool VirtualMachine::configure(const char *c_path, ALUTimings &at)
 
 bool VirtualMachine::init(const char *config)
 {
-    ALUTimings _aluTiming;
+    _print_instruction = false;
+    _print_branch_offset = false;
+    _length_trap = 0;
+    _cycle_trap = 0;
     
     // Configure using file
     // Configure the VM using the config file
+    _branch_cycles = kDefaultBranchCycles;
+    ALUTimings _aluTiming;
     if (configure(config, _aluTiming))
     {
         fprintf(stderr, "VM configuration failed.\n");
@@ -402,7 +424,7 @@ bool VirtualMachine::init(const char *config)
     
     // Load interrupt controller
     printf("Loading interrupt controller.\n");
-    icu = new InterruptController(this);
+    icu = new InterruptController(this, _swint_cycles);
     icu->init();
     
     // Create initial sane environment
@@ -536,6 +558,13 @@ void VirtualMachine::eval(char *op)
     respsize = strlen(response);
 }
 
+void VirtualMachine::trap(const char *error)
+{
+    if (error) fprintf(stderr, "CPU TRAP: %s\n", error);
+    _ir = 0xEF000000;
+    execute();
+}
+
 void VirtualMachine::run(bool break_after_fex)
 {
     printf("Starting execution at %#x\n", _pc);
@@ -543,16 +572,21 @@ void VirtualMachine::run(bool break_after_fex)
     {
         // Fetch PC instruction into IR and increment the pc
         _cycle_count += mmu->readWord(_pc, _ir);
-        printf("PC: %#X\t\t\t%#X\n", _pc, _ir);
+        
+        // Print instruction if requested
+        if (_print_instruction)
+            printf("PC: %#X\t\t\t%#X\n", _pc, _ir);
+        
         _pc += kRegSize;
         
-        // FOR NOW:
-        if (_pc > (0x50 + _cs))
+        // Set this up to break out of possibly invalid jumps
+        if (_length_trap)
         {
-            fprintf(stderr, "CPU TRAP: Program unlikely to be this long.\n");
-            _ir = 0xEF000000;
-            execute();
-            continue;
+            if (_pc > (_length_trap + _cs))
+            {
+                trap("Program unlikely to be this long.");
+                continue;
+            }
         }
         
         // If the cond code precludes execution of the op, don't bother
@@ -561,6 +595,16 @@ void VirtualMachine::run(bool break_after_fex)
         
         // Do the op
         _cycle_count += execute();
+        
+        // Set this up to break out of possible infinite loops
+        if (_cycle_trap)
+        {
+            if (_cycle_count > _cycle_trap)
+            {
+                trap("Cycle count unlikely to be this large.");
+                continue;
+            }
+        }
     }
     
     // Should we bother to wait for server commands?

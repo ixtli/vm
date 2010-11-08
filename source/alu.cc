@@ -319,4 +319,3 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
     return (_timing.op[op]);
 }
 
-

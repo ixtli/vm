@@ -7,24 +7,21 @@ enum SWIntInstructionMask {
     kSWIntCommentMask   = 0x00FFFFFF
 };
 
-enum SWIntTiming {
-    kSWIntUserMode      = 10
-};
-
 // Forward class definitions
 class VirtualMachine;
 
 class InterruptController
 {
 public:
-    InterruptController(VirtualMachine *vm);
+    InterruptController(VirtualMachine *vm, cycle_t timing = 0);
     ~InterruptController();
     
     bool init();
     
     // Operational: must return the timing
-    size_t swint(reg_t comment);
+    cycle_t swint(reg_t comment);
 private:
+    cycle_t _swint_cycles;
     VirtualMachine *_vm;
 };
 

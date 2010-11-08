@@ -147,6 +147,7 @@ private:
     bool evaluateConditional();
     cycle_t execute();
     void eval(char *op);
+    void trap(const char *error);
     
     // Units
     MMU *mmu;
@@ -159,6 +160,9 @@ private:
     
     // VM state
     char *_program_file, *_dump_file;
+    bool _print_branch_offset, _print_instruction;
+    reg_t _length_trap;
+    cycle_t _cycle_trap;
     
     // Machine info
     reg_t _mem_size, _read_cycles, _write_cycles, _stack_size;
@@ -174,7 +178,7 @@ private:
     reg_t _int_table_size, _int_function_size;
     
     // state info
-    cycle_t _cycle_count;
+    cycle_t _cycle_count, _swint_cycles, _branch_cycles;
 };
 
 // SIGINT flips this to tell everything to turn off

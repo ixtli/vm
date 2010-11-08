@@ -116,7 +116,7 @@ class Assembler:
             if len(label):
                 # It's a label
                 if previous_was_label == 0:
-                    self.label[label[0]] = instruction_index + 1;
+                    self.label[label[0]] = instruction_index;
                     previous_was_label == 1;
                     self.infile.remove(line);
                 else:
@@ -228,7 +228,17 @@ class Assembler:
                     bin += self.branch[instruction];
                 elif (instruction == "bl"):
                     bin += self.branch[instruction];
+                
                 offset = abs(instruction_index - self.label[branch_loc]);
+                
+                # Are we going forward or back?
+                if instruction_index > self.label[branch_loc] :
+                    # if we are, add one because after the instruction is loaded
+                    # the pc is incremented, so it's going to actually be one
+                    # AHEAD of the instruction being executed 
+                    offset += 1;
+                
+                print "Offset: " + str(offset)
                 
                 # format the offset as 2's comp. and add it to the instruction
                 binoffset = self.decimal_to_binary(offset);
