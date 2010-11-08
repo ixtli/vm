@@ -1,6 +1,17 @@
 #ifndef _LUAVM_H_
 #define _LUAVM_H_
 
+enum LuaError {
+    kLuaNoError         = 0,
+    kLuaUnexpectedType  = 1,
+    kLuaTableNotOpen    = 2,
+    kLuaInvalidName     = 3
+};
+
+enum LuaFields {
+    kLBool, kLDouble, kLUInt, kLInt, kLString
+};
+
 enum LuaConstants {
     kLuaMultiRet        = -1
 };
@@ -17,13 +28,13 @@ public:
     bool exec(const char *path, int results = kLuaMultiRet);
     
     // Retrieve values from global state
-    int getGlobalBool(const char *name, bool &ret);
-    int getGlobalDouble(const char *name, double &ret);
-    int getGlobalUInt(const char *name, unsigned int &ret);
-    int getGlobalInt(const char *name, int &ret);
-    int getGlobalString(const char *name, const char **ret);
+    LuaError getGlobalField(const char *name, LuaFields field, void *ret);
+    LuaError getTableField(const char *name, LuaFields field, void *ret);
+    LuaError openGlobalTable(const char *name);
+    LuaError closeTable();
     
 private:
+    LuaError getTopField(LuaFields field, void *ret);
     void reportErrors();
     lua_State *L;
 };

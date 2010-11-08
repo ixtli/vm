@@ -19,11 +19,15 @@ ALU::~ALU()
     _vm = NULL;
 }
 
-bool ALU::init()
+bool ALU::init(ALUTimings &timing)
 {
     // Return true if instantiation failed
     if (!_vm) return (true);
     
+    // Copy the supplied timing struct
+    _timing.copy(timing);
+    
+    // Init the carry_out
     _carry_out = false;
     return (false);
 }
@@ -133,19 +137,24 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
     reg_t dest;
     reg_t *source = _vm->selectRegister(s);
     
+    // Since we index an array using op later, make sure it's within range
+    if (op >= kDPOpcodeCount)
+    {
+        fprintf(stderr, "ALU TRAP: Unknown ALU operation.  Performing NOP.\n");
+        return (_timing.op[kNOP]);
+    }
+    
     switch (op)
     {
         case kADD:
         if (!I) shiftOffset(op2);
         dest = *source + op2;
-        cycles += kADDCycles;
         break;
         
         case kSUB:
         arithmetic = true;
         if (!I) shiftOffset(op2);
         dest = *source - op2;
-        cycles += kSUBCycles;
         break;
         
         case kMUL:
@@ -154,19 +163,16 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
         dest = ((*source) * op2); //store lowest 32 bits on Rd
         //dest = ((*source) * op2) & 4294967295; //store lowest 32 bits on Rd
         //pq[0] = (*source * op2) >> 32; //shift 32 bits right, to give highest bits
-        cycles += kMULCycles;
         break;
         
         case kMOD:
         if (!I) shiftOffset(op2);
         dest = *source % op2;
-        cycles += kMODCycles;
         break;
         
         case kDIV:
         if (!I) shiftOffset(op2);
         dest = *source / op2;
-        cycles += kDIVCycles;
         break;
         
         case kMOV:
@@ -181,35 +187,30 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
             // Make a giant literal out of 
             dest = (*source << 10) | op2;
         }
-        cycles += kMOVCycles;
         break;
         
         case kAND:
         arithmetic = false;
         if (!I) shiftOffset(op2);
         dest = *source & op2;
-        cycles += kANDCycles;
         break;
         
         case kORR:
         arithmetic = false;
         if (!I) shiftOffset(op2);
         dest = *source | op2;
-        cycles += kORRCycles;
         break;
         
         case kXOR:
         arithmetic = false;
         if (!I) shiftOffset(op2);
         dest = *source ^ op2;
-        cycles += kXORCycles;
         break;
         
         case kNOT:
         arithmetic = false;
         if (!I) shiftOffset(op2);
         dest = ~(*source);
-        cycles += kNOTCycles;
         break;
         
         case kCMP:
@@ -217,7 +218,6 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
         commit = false;
         if (!I) shiftOffset(op2);
         dest = *source - op2;
-        cycles += kCMPCycles;
         break;
         
         case kCMN:
@@ -225,7 +225,6 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
         commit = false;
         if (!I) shiftOffset(op2);
         dest = *source + op2;
-        cycles += kCMNCycles;
         break;
         
         case kTST:
@@ -233,7 +232,6 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
         commit = false;
         if (!I) shiftOffset(op2);
         dest = *source & op2;
-        cycles += kTSTCycles;
         break;
         
         case kTEQ:
@@ -241,19 +239,17 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
         commit = false;
         if (!I) shiftOffset(op2);
         dest = *source ^ op2;
-        cycles += kTEQCycles;
         break;
         
         case kBIC:
         arithmetic = false;
         if (!I) shiftOffset(op2);
         dest = *source & ~op2;
-        cycles += kBICCycles;
         break;
         
         case kNOP:
         default:
-        return (kNOPCycles);
+        return (_timing.op[kNOP]);
     }
     
     // We're done if we're not setting status bits
@@ -319,7 +315,8 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
     if (commit)
         *(_vm->selectRegister(d)) = dest;
     
-    return (cycles);
+    // Return timing
+    return (_timing.op[op]);
 }
 
 

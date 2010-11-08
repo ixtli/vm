@@ -13,3 +13,7 @@ stack_size = 32
 -- Memory
 read_cycles = 100
 write_cycles = 100
+
+-- ALU timings
+--  If not set, defaults to 1
+alu_timings = {DIV=10, MUL=5}

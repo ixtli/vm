@@ -71,15 +71,8 @@ int main(int argc, char *argv[])
     // Now that we've intialized our environment, start the machine
     VirtualMachine *vm = new VirtualMachine() ;
     
-    // Configure the VM using the config file
-    if (vm->configure(config_path))
-    {
-        fprintf(stderr, "VM configuration failed, aborting.\n");
-        exit(2);
-    }
-    
     // Init the VM
-    if (vm->init())
+    if (vm->init(config_path))
     {
         // We found a problem.
         fprintf(stderr, "VM init failed, aborting.\n");

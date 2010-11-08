@@ -67,81 +67,111 @@ bool LuaVM::exec(const char *path, int results)
     return (false);
 }
 
-// Error codes: 0 - No error
-//              1 - invalid *name
-//              2 - value named is not the right type
-int LuaVM::getGlobalBool(const char *name, bool &ret)
+LuaError LuaVM::getTopField(LuaFields field, void *ret)
 {
-    // Error check
-    if (!name) return (1);
+    LuaError err = kLuaNoError;
     
-    lua_getfield(L, LUA_GLOBALSINDEX, name);
-    if (!lua_isboolean(L, -1))
-        return (2);
+    // Check to make sure the request is what we think it is
+    switch (field)
+    {
+        case kLBool:
+        if (!lua_isboolean(L, -1))
+            err = kLuaUnexpectedType;
+        else
+            *((bool *)ret) = lua_toboolean(L, -1);
+        break;
+        
+        case kLString:
+        if (!lua_isstring(L, -1))
+            err = kLuaUnexpectedType;
+        else 
+            *((const char **)ret) = lua_tostring(L, -1);
+        break;
+        
+        case kLUInt:
+        case kLInt:
+        case kLDouble:
+        default:
+        if (!lua_isnumber(L, -1))
+        {
+            err = kLuaUnexpectedType;
+        } else {
+            switch (field)
+            {
+                case kLUInt:
+                *((unsigned int *)ret) = (unsigned int) lua_tointeger(L, -1);
+                break;
+                
+                case kLDouble:
+                *((double *)ret) = lua_tonumber(L, -1);
+                break;
+                
+                case kLInt:
+                default:
+                *((int *)ret) = lua_tointeger(L, -1);
+                break;
+            }
+        }
+        break;
+    }
     
-    ret = lua_toboolean(L, -1);
-    lua_pop(L, 1);
-    
-    return (0);
+    return (err);
 }
 
-int LuaVM::getGlobalDouble(const char *name, double &ret)
+LuaError LuaVM::getGlobalField(const char *name, LuaFields field, void *ret)
 {
     // Error check
-    if (!name) return (1);
+    if (!name) return (kLuaInvalidName);
     
+    // Request field from lua
     lua_getfield(L, LUA_GLOBALSINDEX, name);
-    if (!lua_isnumber(L, -1))
-        return (2);
     
-    ret = lua_tonumber(L, -1);
+    // Process the field
+    LuaError err = getTopField(field, ret);
+    
+    // Clean up and exit
     lua_pop(L, 1);
-    
-    return (0);
+    return (err);
 }
 
-int LuaVM::getGlobalInt(const char *name, int &ret)
+LuaError LuaVM::getTableField(const char *name, LuaFields field, void *ret)
 {
-    // Error check
-    if (!name) return (1);
+    if (!name) return (kLuaInvalidName);
     
-    lua_getfield(L, LUA_GLOBALSINDEX, name);
-    if (!lua_isnumber(L, -1))
-        return (2);
+    if (!lua_istable(L, -1))
+        return (kLuaTableNotOpen);
     
-    ret = lua_tointeger(L, -1);
+    // Push the parameter on the stack, in this case the name of the key
+    // in the Lua table
+    lua_pushstring(L, name);
+    // Get the value for the key.  The key is popped and the result is pushed.
+    lua_gettable(L, -2);
+    
+    // Result is now at (L, -1)
+    LuaError err = getTopField(field, ret);
+    
+    // Clean up the result and exit
     lua_pop(L, 1);
-    
-    return (0);
+    return (err);
 }
 
-int LuaVM::getGlobalUInt(const char *name, unsigned int &ret)
+LuaError LuaVM::openGlobalTable(const char *name)
 {
-    // Error check
-    if (!name) return (1);
+    if (!name) return (kLuaInvalidName);
     
     lua_getfield(L, LUA_GLOBALSINDEX, name);
-    if (!lua_isnumber(L, -1))
-        return (2);
+    if (!lua_istable(L, -1))
+        return (kLuaUnexpectedType);
     
-    ret = (unsigned int) lua_tointeger(L, -1);
-    lua_pop(L, 1);
-    
-    return (0);
+    return (kLuaNoError);
 }
 
-int LuaVM::getGlobalString(const char *name, const char **ret)
+LuaError LuaVM::closeTable()
 {
-    // Error check
-    if (!name) return (1);
+    if (!lua_istable(L, -1))
+        return (kLuaTableNotOpen);
     
-    lua_getfield(L, LUA_GLOBALSINDEX, name);
-    if (!lua_isstring(L, -1))
-        return (2);
-    
-    *ret = lua_tostring(L, -1);
     lua_pop(L, 1);
     
-    return (0);
+    return (kLuaNoError);
 }
-

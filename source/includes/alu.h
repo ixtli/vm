@@ -31,26 +31,32 @@ enum ShiftOperations {
 
 enum DataProcessingOpCodes {
     kADD, kSUB, kMOD, kMUL, kDIV, kAND, kORR, kNOT,
-    kXOR, kCMP, kCMN, kTST, kTEQ, kMOV, kBIC, kNOP
+    kXOR, kCMP, kCMN, kTST, kTEQ, kMOV, kBIC, kNOP,
+    kDPOpcodeCount
 };
 
-enum DataProcessingTimings {
-    kADDCycles          = 1,
-    kSUBCycles          = 1,
-    kMODCycles          = 1,
-    kMULCycles          = 1,
-    kDIVCycles          = 1,
-    kANDCycles          = 1,
-    kORRCycles          = 1,
-    kNOTCycles          = 1,
-    kXORCycles          = 1,
-    kNOPCycles          = 0,
-    kMOVCycles          = 1,
-    kCMPCycles          = 1,
-    kCMNCycles          = 1,
-    kTSTCycles          = 1,
-    kTEQCycles          = 1,
-    kBICCycles          = 1
+static const char *DPOpMnumonics[kDPOpcodeCount] =
+{   "ADD", "SUB", "MOD", "MUL", "DIV", "AND", "ORR", "NOT",
+    "XOR", "CMP", "CMN", "TST", "TEQ", "MOV", "BIC", "NOP"
+};
+
+// Default timing for ANY instruction not specified in config file
+#define kDefaultALUTiming   1
+
+struct ALUTimings {
+    ALUTimings()
+    {
+        for (int i = 0; i < kDPOpcodeCount; i++)
+            op[i] = kDefaultALUTiming;
+    }
+    
+    inline void copy(ALUTimings &src)
+    {
+        for (int i = 0; i < kDPOpcodeCount; i++)
+            op[i] = src.op[i];
+    }
+    
+    cycle_t op[kDPOpcodeCount];
 };
 
 // Forward class definitions
@@ -62,7 +68,7 @@ public:
     ALU(VirtualMachine *vm);
     ~ALU();
     
-    bool init();
+    bool init(ALUTimings &timings);
     
     // Operational: must return the timing
     cycle_t dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2);
@@ -73,6 +79,7 @@ public:
     
 private:
     VirtualMachine *_vm;
+    ALUTimings _timing;
     bool _carry_out;
 };
 

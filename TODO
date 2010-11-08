@@ -1,23 +1,23 @@
 TODO
 
-Assembler and image format for executable
+Image format for executable
+    labels
 
 Interrupt table loading from file (format)
-
-Lua scripting
-	timing
-	machine configuration (memory, pipes, stack, etc..) 
-	interrupt table file
+    lua scriptable
 
 Queue data structure used to represent pipeline
 	Efficiency = Optimal / Actual
 	Dependance checking
 	Installing bubbles based on dependances
 	'squashing' logic in case branch happens
+	Show pipe status in output
+
 
 Ability to step through program using frontend (-b)
 	-b <location> - when PC hits that location break and allow step
 
 Simple Cocoa frontend
 
-Show pipe status
+Write a nontrivial program!
+

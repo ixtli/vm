@@ -81,10 +81,11 @@ enum BranchMasks {
     kBranchOffsetMask   = 0x00FFFFFF
 };
 
-// Forward class definitions
+// Forward class and struct definitions
 class MonitorServer;
 class InterruptController;
 class ALU;
+struct ALUTimings;
 class MMU;
 class FPU;
 
@@ -94,8 +95,7 @@ public:
     VirtualMachine();
     ~VirtualMachine();
     
-    bool configure(const char *c_path);
-    bool init();
+    bool init(const char *config);
     void run(bool break_after_fex);
     void installJumpTable(reg_t *data, reg_t size);
     void installIntFunctions(reg_t *data, reg_t size);
@@ -141,6 +141,7 @@ public:
     size_t opsize, respsize;
     //////////////////////////////////////////////////////////////
 private:
+    bool configure(const char *c_path, ALUTimings &at);
     void resetSegmentRegisters();
     void resetGeneralRegisters();
     bool evaluateConditional();
@@ -178,7 +179,7 @@ private:
 
 // SIGINT flips this to tell everything to turn off
 // Must have it declared extern and at file scope so that we can
-// read it form anywhere, which is assumed safe because of it's type.
+// read it from anywhere, which is assumed safe because of it's type.
 extern "C" {
     extern volatile sig_atomic_t terminate;
 }

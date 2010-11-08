@@ -289,7 +289,7 @@ void VirtualMachine::resetGeneralRegisters()
         _pq[i] = 0;
 }
 
-bool VirtualMachine::configure(const char *c_path)
+bool VirtualMachine::configure(const char *c_path, ALUTimings &at)
 {
     
     // Parse the config file
@@ -312,14 +312,27 @@ bool VirtualMachine::configure(const char *c_path)
     const char *prog_temp, *dump_temp;
     
     // Grab the config data from the global state of the VM post exec
-    err += lua->getGlobalUInt("memory_size", _mem_size);
-    err += lua->getGlobalUInt("read_cycles", _read_cycles);
-    err += lua->getGlobalUInt("write_cycles", _write_cycles);
+    err += lua->getGlobalField("memory_size", kLUInt, &_mem_size);
+    err += lua->getGlobalField("read_cycles", kLUInt, &_read_cycles);
+    err += lua->getGlobalField("write_cycles", kLUInt, &_write_cycles);
     
     // Optional arguments
-    lua->getGlobalUInt("stack_size", _stack_size);
-    lua->getGlobalString("program", &prog_temp);
-    lua->getGlobalString("memory_dump", &dump_temp);
+    lua->getGlobalField("stack_size", kLUInt, &_stack_size);
+    lua->getGlobalField("program", kLString, &prog_temp);
+    lua->getGlobalField("memory_dump", kLString, &dump_temp);
+    
+    // Deal with ALU timings
+    if (lua->openGlobalTable("alu_timings") != kLuaUnexpectedType)
+    {
+        // User defined the table, so pull all the ops out of it
+        for (int i = 0; i < kDPOpcodeCount; i++)
+            lua->getTableField(DPOpMnumonics[i], kLUInt, (void *) &at.op[i]);
+        
+        printf("ALU Op '%s' set to %lu\n", DPOpMnumonics[kMUL], at.op[kMUL]);
+        
+        // Clean up
+        lua->closeTable();
+    }
     
     // If 
     if (err)
@@ -340,8 +353,18 @@ bool VirtualMachine::configure(const char *c_path)
     return (false);
 }
 
-bool VirtualMachine::init()
+bool VirtualMachine::init(const char *config)
 {
+    ALUTimings _aluTiming;
+    
+    // Configure using file
+    // Configure the VM using the config file
+    if (configure(config, _aluTiming))
+    {
+        fprintf(stderr, "VM configuration failed.\n");
+        return (true);
+    }
+    
     // Initialize server_mutex for MonitorServer
     pthread_mutex_init(&server_mutex, NULL);
     
@@ -359,7 +382,7 @@ bool VirtualMachine::init()
     
     // Start up ALU
     alu = new ALU(this);
-    if (alu->init()) return (true);
+    if (alu->init(_aluTiming)) return (true);
     
     // Start up FPU
     fpu = new FPU(this);
