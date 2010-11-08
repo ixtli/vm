@@ -13,7 +13,6 @@ Queue data structure used to represent pipeline
 	'squashing' logic in case branch happens
 	Show pipe status in output
 
-
 Ability to step through program using frontend (-b)
 	-b <location> - when PC hits that location break and allow step
 
