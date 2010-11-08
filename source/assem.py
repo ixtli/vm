@@ -35,6 +35,13 @@ class Assembler:
                     "fpr3": "11011", "fpr4" : "11100", "fpr5" : "11101", 
                     "fpr6": "11110", "fpr7" : "11111"}
     
+    condition_codes = { "eq" : "0000", "ne" : "0001", "cs" : "0010",
+                        "cc" : "0011", "mi" : "0100", "pl" : "0101", 
+                        "vs" : "0110", "vc" : "0111", "hi" : "1000", 
+                        "ls" : "1001", "ge" : "1010", "lt" : "1011", 
+                        "gt" : "1100", "le" : "1101", "al" : "1110",
+                        "nv" : "1111" }
+    
     #the mnemonics of all arithmetic and logic instructions
     arithmetic_logic = {    "add" : "0000", "sub" : "0001", "mod" : "0010",
                             "mul" : "0011", "div" : "0100", "and" : "0101",
@@ -174,7 +181,7 @@ class Assembler:
             else:
                 src2 = "00"
             
-            cond_code = "1110";             #condition code
+            cond_code = self.condition_codes["al"]; # default condition code
             bin = cond_code;
             
             # check if its an arithmetic/logic/compare/test instruction
@@ -185,7 +192,7 @@ class Assembler:
                 # mov is a special case
                 if instruction == "mov":
                     src2 = src1
-                    src1 = "00"
+                    src1 = "0000"
                 
                 # check if there is an r (register), or if its immediate
                 if (src2[0] == "r"): 
