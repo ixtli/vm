@@ -131,12 +131,14 @@ class Assembler:
         previous_was_label = 0;
         instruction_index = 0;
         for line in self.infile:
-            label = self.explodeLabel(line)
+            print line;
+            label = self.explodeLabel(line)   
             if len(label):
                 # It's a label
+                instruction_index += 1;
                 if previous_was_label == 0:
                     self.label[label[0]] = instruction_index;
-                    previous_was_label == 1;
+                    previous_was_label = 1;
                     self.infile.remove(line);
                 else:
                     # If we don't do this, this function needs to be recurive
@@ -145,8 +147,8 @@ class Assembler:
                     self.infile.remove(line);
                     print "Only one label per location, please."
             else:
-                previous_was_label == 0
-                instruction_index += 1;
+                instruction_index += 1;     
+                previous_was_label = 0;
 
     def assemble(self):
         
@@ -156,7 +158,6 @@ class Assembler:
         
         # Perform the first pass, collecting all labels
         self.firstPass();
-        
         instruction_index = 0;
         
         # Perform the second pass, changing the instructions into ops
@@ -177,7 +178,7 @@ class Assembler:
             else:
                 cond_code = self.condition_codes["al"]; # default condition code
                 instruction = line[0];
-            print "asssssss "+ str(cond_code)                
+            
             dest = line[1];
             
             if len(line) < 3:               #destination reg
