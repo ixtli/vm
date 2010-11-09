@@ -147,8 +147,7 @@ class Assembler:
             else:
                 previous_was_label == 0
                 instruction_index += 1;
-            
-    
+
     def assemble(self):
         
         """
@@ -168,7 +167,17 @@ class Assembler:
             
             i = 0;
             immediate = 0;
-            instruction = line[0];          #the operation (add, etc..)
+            if line[0] in self.condition_codes:
+                cond_code = self.condition_codes[line[0]];
+                instruction = line[1];          #the operation (add, etc..)a
+                # instead of creating an offset for all other calls of line[]
+                # just move everything back 1 position
+                for i in range(0, len(line)-1):
+                    line[i] = line[i+1];
+            else:
+                cond_code = self.condition_codes["al"]; # default condition code
+                instruction = line[0];
+            print "asssssss "+ str(cond_code)                
             dest = line[1];
             
             if len(line) < 3:               #destination reg
@@ -181,7 +190,6 @@ class Assembler:
             else:
                 src2 = "00"
             
-            cond_code = self.condition_codes["al"]; # default condition code
             bin = cond_code;
             
             # check if its an arithmetic/logic/compare/test instruction
@@ -242,7 +250,7 @@ class Assembler:
             elif (instruction in self.branch):
                 branch_loc = dest;
                 # begin formatting the binary string
-                bin = "1110";
+                bin = cond_code;
                 if (instruction == "b"):
                     bin += self.branch[instruction];
                 elif (instruction == "bl"):
@@ -269,8 +277,7 @@ class Assembler:
                 
             else:
                 print "wrong instruction";
-                
-            instruction_index += 1;
+                instruction_index += 1;
 
 if __name__ == "__main__":
     a = Assembler()
