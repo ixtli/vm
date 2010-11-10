@@ -277,7 +277,7 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
     {
         if (arithmetic)
         {
-            // Set V if there was an overflow into the 31st bit
+            // Set V if there was an overflow into the 31st bit of the result
             // My understanding of this is that if 31st bit was NOT
             // set in *source, but is in *dest, set V
             if (dest & kMSBMask)
@@ -294,6 +294,7 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
                 if (dest == 0x0) {
                     SET_Z;
                 } else {
+                    // TODO: I am not entirely sure this is right ...
                     // As long as we're not zero, we might be super large
                     if (dest < *source)
                         SET_C;
