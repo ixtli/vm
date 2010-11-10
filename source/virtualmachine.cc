@@ -372,6 +372,7 @@ bool VirtualMachine::configure(const char *c_path, ALUTimings &at)
 
 bool VirtualMachine::init(const char *config)
 {
+    // Set defaults
     _print_instruction = false;
     _print_branch_offset = false;
     _length_trap = 0;
@@ -538,6 +539,8 @@ void VirtualMachine::eval(char *op)
         sprintf(temp+strlen(temp), "User mode\n");
     sprintf(temp+strlen(temp),  "Cycle Count: %lu\n", _cycle_count);
     sprintf(temp+strlen(temp),  "Program Status Register: %#x\n", _psr);
+    sprintf(temp+strlen(temp),  "N: %s V: %s C: %s Z: %s\n", N_SET ? "1" : "0",
+        V_SET ? "1" : "0", C_SET ? "1" : "0", Z_SET ? "1" : "0");
     sprintf(temp+strlen(temp),  "Program Counter: %#x\n", _pc);
     sprintf(temp+strlen(temp),  "Instruction Register: %#x\n", _ir);
     sprintf(temp+strlen(temp),  "Code segment: %#x\n", _cs);

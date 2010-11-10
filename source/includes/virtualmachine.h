@@ -41,7 +41,7 @@ enum VMPSRBits {
     kPSRVBit            = 0x00000008
 };
 
-#define NVCZ_MASK (kPSRNBit & kPSRVBit & kPSRCBit & kPSRZBit)
+#define NVCZ_MASK (kPSRNBit | kPSRVBit | kPSRCBit | kPSRZBit)
 
 enum VMOpPrefixConditions {
     kCondEQ, kCondNE, kCondCS, kCondCC, kCondMI, kCondPL, kCondVS, kCondVC, 
@@ -63,7 +63,7 @@ enum VMComponantTimings {
 };
 
 enum VMRegisterDefaults {
-    kPSRDefault = 0x4000
+    kPSRDefault = 0x0000
 };
 
 enum InstructionOpCodeMasks {

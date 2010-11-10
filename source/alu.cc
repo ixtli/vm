@@ -11,6 +11,16 @@
 #define Z_SET     (_vm->_psr & kPSRZBit)
 #define Z_CLEAR  !(_vm->_psr & kPSRZBit)
 
+// Macros for SETTING the PSR
+#define SET_N     (_vm->_psr &= kPSRNBit)
+#define CLEAR_N   (_vm->_psr ^= kPSRNBit)
+#define SET_V     (_vm->_psr &= kPSRVBit)
+#define CLEAR_V   (_vm->_psr ^= kPSRVBit)
+#define SET_C     (_vm->_psr &= kPSRCBit)
+#define CLEAR_C   (_vm->_psr ^= kPSRCBit)
+#define SET_Z     (_vm->_psr &= kPSRZBit)
+#define CLEAR_Z   (_vm->_psr ^= kPSRZBit)
+
 ALU::ALU(VirtualMachine *vm) : _vm(vm)
 {}
 
@@ -258,11 +268,12 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
     //       confusion when you branch or something.
     
     // Reset status bits that are effected
-    _vm->_psr &= ~NVCZ_MASK;
+    // We probably don't want to do this ... 
+    //_vm->_psr &= ~NVCZ_MASK;
     
     // Set status bits
     // There are two cases, logical and arithmetic
-    if ( !(s || d == kPCCode))
+    if ( !(s == kPCCode || d == kPCCode))
     {
         if (arithmetic)
         {
@@ -272,24 +283,24 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
             if (dest & kMSBMask)
             {
                 if (!(*source & kMSBMask))
-                    V_SET;
+                    SET_V;
                 else
-                    V_CLEAR;
+                    CLEAR_V;
                 
                 // Also, set the negative bit
-                N_SET;
+                SET_N;
             } else {
                 // Z flag set if dest is zero
                 if (dest == 0x0) {
-                    Z_SET;
+                    SET_Z;
                 } else {
                     // As long as we're not zero, we might be super large
                     if (dest < *source)
-                        C_SET;
+                        SET_C;
                     else
-                        C_CLEAR;
+                        CLEAR_C;
                     
-                    Z_CLEAR;
+                    CLEAR_Z;
                 }
             }
         
@@ -299,15 +310,15 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
             
             // Z flag is set if result is all zeros
             if (dest == 0x0)
-                Z_SET;
+                SET_Z;
             else
-                Z_CLEAR;
+                CLEAR_Z;
             
             // N flag is set to the logical value of bit 31 of the result
             if (dest & kMSBMask)
-                N_SET;
+                SET_N;
             else
-                N_CLEAR;
+                CLEAR_N;
             
             // (V Flag is uneffected by logical operations)
         }

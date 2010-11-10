@@ -364,7 +364,6 @@ class Assembler:
                 # Last ten packed into op2
                 op2 = lit[5:]
                 # Finish writing the instruction
-                print source + dest + op2
                 return ret + source + dest + op2
                 
             else:
@@ -449,7 +448,6 @@ class Assembler:
         
         # Perform the second pass, changing the instructions into ops
         for lines in self.infile:
-            print lines;
             
             line = self.explodeOp(lines)
             
@@ -489,21 +487,11 @@ class Assembler:
                     continue
                 
                 branch_loc = line[0];
+                
                 # begin formatting the binary string
-                bin = cond_code;
-                if (instruction == "b"):
-                    bin += self.branch[instruction];
-                elif (instruction == "bl"):
-                    bin += self.branch[instruction];
+                bin = cond_code + self.branch[instruction];
                 
                 offset = abs(instruction_index - self.label[branch_loc]);
-                
-                # Are we going forward or back?
-                if instruction_index > self.label[branch_loc] :
-                    # if we are, add one because after the instruction is loaded
-                    # the pc is incremented, so it's going to actually be one
-                    # AHEAD of the instruction being executed 
-                    offset += 1;
                 
                 print "Offset: " + str(offset)
                 
@@ -515,7 +503,6 @@ class Assembler:
                 print "Invalid operation '" + instruction + "'.";
                 bin = self.condition_codes["nv"] + self.decToBin(0, 28)
             
-            print bin;
             outfile.write(bin + "\n");
             instruction_index += 1;
         
