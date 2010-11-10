@@ -356,7 +356,7 @@ class Assembler:
                 ret += "1" + self.comp_test["mov"] + set_cond
                 # We get a combined 15 bit literal space in the mov op
                 if int(line[0]) > 32767:
-                    print("Warning: literal "+line[0]+"truncated.")
+                    print("Warning: literal "+line[0]+" truncated to 32767.")
                 
                 lit = self.decToBin(int(line[0]), 15)
                 # Most sig 5 bits packed into source
@@ -364,6 +364,7 @@ class Assembler:
                 # Last ten packed into op2
                 op2 = lit[5:]
                 # Finish writing the instruction
+                print source + dest + op2
                 return ret + source + dest + op2
                 
             else:

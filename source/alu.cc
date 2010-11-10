@@ -184,8 +184,9 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
             shiftOffset(op2, source);
             dest = op2;
         } else {
-            // Make a giant literal out of 
-            dest = (*source << 10) | op2;
+            // Make a giant literal out of the five bits where source would be
+            // and the 10 bits of op2
+            dest = (s << 10) | op2;
         }
         break;
         
