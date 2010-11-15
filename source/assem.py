@@ -69,10 +69,9 @@ class Assembler:
                     "teq" : "1100", "mov" : "1101", "nop" : "1111"}
     
     # mnumonics for loads and stores
-    # ( the bang sign means write back into source register )
-    singele_transfer = {    "ldw" : "100", "ldw!": "110", "ldb" : "101",
-                            "ldb!": "111", "stw" : "000", "stw!": "010",
-                            "stb" : "001", "stb!": "011"}
+    # By default, NO writeback (second bit) and PRE offset (fourth bit)
+    single_transfer = {    "ldw" : "1001", "ldb" : "1011", "stw" : "0001",
+                            "stb" : "0011" }
     
     # Branch mnumonics
     branch = {  "b" : "1010", "bl" : "1011"};
@@ -92,13 +91,11 @@ class Assembler:
         """
         
         f = open(sys.argv[1] , 'r');
-        print "Input file:"
         
         for line in f:
             l = line.strip()
             if len(l) > 0:
                 # Deal with these-style comments
-                print l
                 if l[0] != "#":
                     self.infile.append(l)
         print " "
@@ -436,6 +433,83 @@ class Assembler:
             return ret + source + dest + op2
         
     
+    def parseSingleTransfer(self, instruction, line):
+        # s/d base offset
+        # s/d base
+        
+        ret = "01"
+        
+        if len(line) < 2:
+            print("Too few single transfer arguments.")
+            return None
+        
+        op = self.single_transfer[instruction]
+        
+        # Do pre by default
+        pre = "1"
+        
+        # add by default
+        add = "1"
+        
+        # A bang after the instruction means to enable writeback
+        if line[0] == "!":
+            op[1] = "1"
+            del line[0]
+        
+        if len(line) < 2:
+            print("Too few single transfer arguments.")
+            return None
+        
+        if line[0] not in self.registers:
+            print("Invalid register specifier '"+line[0]+"'.")
+            return None
+        sd_reg = self.registers[line[0]]
+        del line[0]
+        
+        if line[0] not in self.registers:
+            print("Invalid register specifier '"+line[0]+"'.")
+            return None
+        base = self.registers[line[0]]
+        del line[0]
+        
+        if len(line) == 0:
+            # Nothing left to do
+            offset = self.decToBin(0, 10)
+            ret += "0" + op + pre + add
+            return ret + base + sd_reg + offset
+        
+        # Otherwise, we need to handle having an offset
+        # (-)immediate
+        # SHIFT
+        if len(line) == 1:
+            # Immediate offset
+            imm = int(line[0])
+            if imm < 0:
+                # negative, so set add to false (subtract)
+                imm = abs(imm)
+                add = "0"
+            
+            offset = self.decToBin(imm, 10)
+            ret += "0" + op + pre + add
+            return ret + base + sd_reg + offset
+        
+        # If we got here, the user wants to send the rest to the barrel
+        # shifter
+        
+        # TODO: Specify subtracting the offset from the base in a prettier
+        # way than a "-" sign ...
+        if line[0] == "-":
+            add = "0"
+        
+        # Handle the offset in the same way as the DP instructions
+        offset = self.barrelShfit(line)
+        if offset == None:
+            return None
+        
+        ret += "1" + op + pre + add
+        return ret + base + sd_reg + offset
+        
+    
     def assemble(self):
         
         """
@@ -479,7 +553,21 @@ class Assembler:
                     continue
                 
                 bin += val
+            elif instruction in self.single_transfer:
+                val = self.parseSingleTransfer(instruction, line)
+                if val == None:
+                    continue
                 
+                bin += val
+                print bin
+            elif instruction in self.interrupt:
+                if len(line) < 1:
+                    print("Must specify interrupt table offset.")
+                    continue
+                
+                bin += self.interrupt[instruction]
+                bin += self.decToBin(int(line[0]), 24)
+            
             elif (instruction in self.branch):
                 
                 if len(line) != 1:
@@ -493,7 +581,7 @@ class Assembler:
                 
                 offset = abs(instruction_index - self.label[branch_loc]);
                 
-                print "Offset: " + str(offset)
+                print "Branch Offset: " + str(offset)
                 
                 # format the offset as 2's comp. and add it to the instruction
                 binoffset = self.decimal_to_binary(offset);
