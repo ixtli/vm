@@ -313,7 +313,7 @@ bool VirtualMachine::configure(const char *c_path, ALUTimings &at)
     if (ret)
     {
         // Something went wrong
-        fprintf(stderr, "Execution of script failed,");
+        fprintf(stderr, "Execution of script failed.");
         delete lua;
         return (true);
     }
@@ -459,54 +459,18 @@ void VirtualMachine::eval(char *op)
             addr = atoi(pch);
         else
             addr = 0;
-    
+        
         pch = strtok(NULL, " ");
         if (pch)
             val = _hex_to_int(pch);
         else
             val = 0;
-    
+        
         mmu->writeWord(addr, val);
-    
+        
         response = (char *)malloc(sizeof(char) * 512);
         sprintf(response, "Value '%i' written to '%#x'.\n",
             val, addr);
-        respsize = strlen(response);
-        return;
-    } else if (strcmp(pch, kReadCommand) == 0) {
-        // read
-        int addr;
-        reg_t val;
-        pch = strtok(NULL, " ");
-        if (pch)
-            addr = atoi(pch);
-        else
-            addr = 0;
-    
-        mmu->readWord(addr, val);
-    
-        response = (char *)malloc(sizeof(char) * 512);
-        sprintf(response, "%#x - %#x\n", addr, val);
-        respsize = strlen(response);
-        return;
-    } else if (strcmp(pch, kRangeCommand) == 0) {
-        // range
-        int addr, val;
-        pch = strtok(NULL, " ");
-        if (pch)
-            addr = atoi(pch);
-        else
-            addr = 0;
-    
-        pch = strtok(NULL, " ");
-        if (pch)
-            val = atoi(pch);
-        else
-            val = 0;
-    
-        char *temp;
-        mmu->readRange(addr, val, true, &temp);
-        response = temp;
         respsize = strlen(response);
         return;
     } else if (strcmp(pch, kExecCommand) == 0) {
@@ -530,7 +494,33 @@ void VirtualMachine::eval(char *op)
         return;
     }
     
-    // If nothing worked just send machine status
+    // If nothing worked
+    respsize = 0;
+}
+
+void VirtualMachine::statusStruct(MachineStatus &s)
+{
+    // Send struct, but it's only ever for 
+    s.type = kStatusMessage;
+    s.supervisor = supervisor ? 1 : 0;
+    s.cycles = _cycle_count;
+    s.psr = _psr;
+    s.pc = _pc;
+    s.ir = _ir;
+    s.cs = _cs;
+    s.ds = _ds;
+    s.ss = _ss;
+    s.pq[0] = _pq[0];
+    s.pq[1] = _pq[1];
+    for (int i = 0; i < kGeneralRegisters; i++)
+        s.r[i] = _r[i];
+    for (int i = 0; i < kFPRegisters; i++)
+        s.f[i] = _fpr[i];
+}
+
+char *VirtualMachine::statusString(size_t &len)
+{
+    // Format human readable
     char temp[1024];
     sprintf(temp, "Machine Status: ");
     if (supervisor)
@@ -555,10 +545,10 @@ void VirtualMachine::eval(char *op)
         "r8 - %u r9 - %u r10 - %u r11 - %u\n", _r[8], _r[9], _r[10], _r[11]);
     sprintf(temp+strlen(temp),  
         "r12 - %u r13 - %u r14 - %u r15 - %u\n", _r[12], _r[13], _r[14], _r[15]);
-    
-    response = (char *)malloc(sizeof(char) * strlen(temp) + 1);
-    strcpy(response, temp);
-    respsize = strlen(response);
+    char *ret = (char *)malloc(sizeof(char) * strlen(temp) + 1);
+    strcpy(ret, temp);
+    len = strlen(ret);
+    return (ret);
 }
 
 void VirtualMachine::trap(const char *error)
@@ -657,4 +647,14 @@ void VirtualMachine::installIntFunctions(reg_t *data, reg_t size)
 void VirtualMachine::shiftOffset(reg_t &offset, reg_t *val)
 {
     alu->shiftOffset(offset, val);
+}
+
+void VirtualMachine::readWord(reg_t addr, reg_t &val)
+{
+    _cycle_count += mmu->readWord(addr, val);
+}
+
+void VirtualMachine::readRange(reg_t start, reg_t end, bool hex, char **ret)
+{
+    _cycle_count += mmu->readRange(start, end, hex, ret);
 }

@@ -1,5 +1,8 @@
 TODO
 
+Server does NOT convert anything to Network Byte Order
+    This is /very/ bad for portability
+
 Image format for executable
     labels
 

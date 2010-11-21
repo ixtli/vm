@@ -81,6 +81,117 @@ void *get_in_addr(struct sockaddr *sa)
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
+void _send_stream_status(VirtualMachine *vm, int fd)
+{
+    size_t len;
+    MachineStatus s;
+    vm->statusStruct(s);
+    
+    send(fd, &s, sizeof(MachineStatus), 0);
+}
+
+void _send_stream_memory(VirtualMachine *vm, int fd, reg_t start, reg_t end)
+{
+    size_t len;
+    char *temp = vm->statusString(len);
+    if (temp)
+    {
+        send(fd, temp, len, 0);
+        free(temp);
+    }
+}
+
+
+void _demux_stream_op(char *buf, size_t size, VirtualMachine *vm, int fd)
+{
+    // Deal with commands sent in the stream format
+    int code = *(int *)buf;
+    switch (code)
+    {
+        case kStatusMessage:
+        printf("Status Message Request.\n");
+        break;
+        
+        case kMemoryRange:
+        printf("Memory Range Request.\n");
+        break;
+        
+        case kStreamHandshake:
+        default:
+        fprintf(stderr, "Stream request format error.\n");
+        break;
+    }
+}
+
+bool _demux_op(char *op, size_t size, VirtualMachine *vm, int fd)
+{
+    // Deal with commands sent as human readable strings
+    
+    // Return true if we handled the request, but only handle read only ops
+    
+    // check for commands that require no arguments
+    if (strncmp(op, kStatCommand, 6) == 0) {
+        // Send status
+        size_t len;
+        char *temp = vm->statusString(len);
+        if (temp)
+        {
+            send(fd, temp, len, 0);
+            free(temp);
+        }
+        return (true);
+    }
+    
+    // Tokenize commands that require args
+    char *pch = strtok(op, " ");
+    if (strcmp(pch, kReadCommand) == 0) {
+        // read
+        reg_t addr;
+        reg_t val;
+        pch = strtok(NULL, " ");
+        if (pch)
+            addr = (reg_t)atoi(pch);
+        else
+            addr = 0;
+        
+        // Do the read
+        vm->readWord(addr, val);
+        
+        // Format a string to be sent
+        char buf[32];
+        sprintf(buf, "%#x - %#x\n", addr, val);
+        buf[31] = '\0';
+        size_t respsize = strlen(buf);
+        send(fd, buf, respsize, 0);
+        
+        return (true);
+    } else if (strcmp(pch, kRangeCommand) == 0) {
+        // range
+        int addr, val;
+        pch = strtok(NULL, " ");
+        if (pch)
+            addr = atoi(pch);
+        else
+            addr = 0;
+        
+        pch = strtok(NULL, " ");
+        if (pch)
+            val = atoi(pch);
+        else
+            val = 0;
+        
+        char *temp;
+        vm->readRange(addr, val, true, &temp);
+        send(fd, temp, strlen(temp), 0);
+        
+        // Clean up
+        if (temp) free(temp);
+        return (true);
+    }
+    
+    return (false);
+}
+
 void *serve( void *ptr )
 {
     printf("Monitor connection listener thread started.\n");
@@ -95,6 +206,7 @@ void *serve( void *ptr )
     
     fd_set master;      // Master fd descr list
     fd_set read_fds;    // temp fd for select()
+    fd_set stream;      // Clients that get stream data and present it using GUI
     int fdmax;          // max file desc number
     
     int listener;
@@ -119,6 +231,7 @@ void *serve( void *ptr )
     // Clear the master and temp sets
     FD_ZERO(&master);
     FD_ZERO(&read_fds);
+    FD_ZERO(&stream);
     
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_UNSPEC;
@@ -229,11 +342,14 @@ void *serve( void *ptr )
                             // keep track of max fd
                             fdmax = newfd;
                         }
-                        printf("New connection from %s on socket %d\n",
+                        printf("New connection from %s on socket %d.\n",
                             inet_ntop(remoteaddr.ss_family,
                             get_in_addr((struct sockaddr *)&remoteaddr),
                             remoteIP, INET6_ADDRSTRLEN),
                             newfd);
+                        
+                        // Send initial status message
+                        
                     }
                 } else {
                     // handle data from client
@@ -250,8 +366,47 @@ void *serve( void *ptr )
                         close(i);
                         // Remove from master set
                         FD_CLR(i, &master);
+                        FD_CLR(i, &stream);
                     } else {
-                        buf[sizeof(buf)-1] = '\0';
+                        if (nbytes == sizeof(StreamHandshake))
+                        {
+                            // Check to see if we're talking to a stream client
+                            if (buf[0] == kStreamHandshake)
+                            {
+                                FD_SET(i, &stream);
+                                printf("Successful handshake with socket %d.\n", i);
+                                // Push status
+                                _send_stream_status(vm, i);
+                                continue;
+                            }
+                        }
+                        
+                        if (nbytes == sizeof(buf))
+                        {
+                            fprintf(stderr, "Client request way too large.");
+                            buf[sizeof(buf)-1] = '\0';
+                            continue;
+                        }
+                        
+                        // Avoid buffer overflows like the plague.
+                        buf[nbytes] = '\0';
+                        
+                        // Are we a stream client?
+                        if (FD_ISSET(i, &stream))
+                        {
+                            _demux_stream_op(buf, nbytes, vm, i);
+                            continue;
+                        }
+                        
+                        // If it's a status check or read operation we don't
+                        // need to fool with mutex operations, so check those
+                        // first.
+                        
+                        if (_demux_op(buf, nbytes, vm, i))
+                            continue;
+                        
+                        // If we get here we need the VM to do something
+                        // like process an opcode, so we need to lock and unlock
                         vm->operation = buf;
                         vm->opsize = sizeof(buf);
                         // give the vm a chance to work
@@ -259,6 +414,8 @@ void *serve( void *ptr )
                         // try to get it back by waiting again
                         // (enter the queue)
                         pthread_mutex_lock(&server_mutex);
+                        // Now we expect response and respsize to be allocated
+                        // and set, respectively.  We also remember to clean up
                         if (vm->respsize > 0)
                         {
                             send(i, vm->response, vm->respsize, 0);
@@ -268,6 +425,7 @@ void *serve( void *ptr )
                             // unknown command
                             char temp[512];
                             sprintf(temp, "Unknown command: %s", buf);
+                            temp[511] = '\0';
                             send(i, temp, strlen(temp), 0);
                         }
                     }

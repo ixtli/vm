@@ -9,6 +9,7 @@
 #define kReadCommand    "READ"
 #define kRangeCommand   "RANGE"
 #define kExecCommand    "EXEC"
+#define kStatCommand    "STATUS"
 
 // Memory constants, in bytes
 #define kMinimumMemorySize 524288
@@ -86,6 +87,7 @@ class MonitorServer;
 class InterruptController;
 class ALU;
 struct ALUTimings;
+struct MachineStatus;
 class MMU;
 class FPU;
 
@@ -101,6 +103,13 @@ public:
     void installIntFunctions(reg_t *data, reg_t size);
     bool loadProgramImage(const char *path, reg_t addr);
     void shiftOffset(reg_t &offset, reg_t *val = NULL);
+    
+    // These are exposed because they are readonly, and thus
+    // threadsafe
+    void statusStruct(MachineStatus &s);
+    char *statusString(size_t &len);
+    void readWord(reg_t addr, reg_t &val);
+    void readRange(reg_t start, reg_t end, bool hex, char **ret);
     
     // Helper methods that might be nice for other things...
     inline reg_t *selectRegister(char val)

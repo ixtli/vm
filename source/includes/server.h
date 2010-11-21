@@ -12,12 +12,28 @@
 
 #define MAX_CONNECTIONS 10
 
-// Server protocol
-#define kCodeLength             3
-#define kTooManyConnections     "100"
-#define kConnectionAccepted     "200"
-#define kServerHangingUp        "300"
-#define kWaitingForRequests     "400"
+enum ServerMessageTypes
+{
+    kStreamHandshake,
+    kStatusMessage,
+    kMemoryRange
+};
+
+typedef struct StreamHandshake
+{
+    char type;
+};
+
+typedef struct MachineStatus
+{
+    char type;
+    reg_t supervisor;
+    cycle_t cycles;
+    reg_t psr, pc, ir, cs, ds, ss;
+    reg_t pq[2];
+    reg_t r[kGeneralRegisters];
+    reg_t f[kFPRegisters];
+};
 
 // Forward class definitions
 class VirtualMachine;
