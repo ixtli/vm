@@ -36,6 +36,11 @@ extern "C" {
 // Init static mutex
 pthread_mutex_t server_mutex;
 
+const reg_t *VirtualMachine::readOnlyMemory(reg_t &size)
+{
+    return (mmu->readOnlyMemory(size));
+}
+
 bool VirtualMachine::evaluateConditional()
 {
     // Evaluate the condition code in the IR
@@ -500,7 +505,7 @@ void VirtualMachine::eval(char *op)
 
 void VirtualMachine::statusStruct(MachineStatus &s)
 {
-    // Send struct, but it's only ever for 
+    // Populate status struct
     s.type = kStatusMessage;
     s.supervisor = supervisor ? 1 : 0;
     s.cycles = _cycle_count;
@@ -516,6 +521,15 @@ void VirtualMachine::statusStruct(MachineStatus &s)
         s.r[i] = _r[i];
     for (int i = 0; i < kFPRegisters; i++)
         s.f[i] = _fpr[i];
+}
+
+void VirtualMachine::descriptionStruct(MachineDescription &d)
+{
+    // Populate description struct
+    d.type = kMachineDescription;
+    d.int_table_length = _int_table_size;
+    d.int_fxn_length = _int_function_size;
+    d.mem_size = _mem_size;
 }
 
 char *VirtualMachine::statusString(size_t &len)

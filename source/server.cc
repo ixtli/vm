@@ -90,30 +90,75 @@ void _send_stream_status(VirtualMachine *vm, int fd)
     send(fd, &s, sizeof(MachineStatus), 0);
 }
 
-void _send_stream_memory(VirtualMachine *vm, int fd, reg_t start, reg_t end)
+void _send_stream_description(VirtualMachine *vm, int fd)
 {
     size_t len;
-    char *temp = vm->statusString(len);
-    if (temp)
-    {
-        send(fd, temp, len, 0);
-        free(temp);
-    }
+    MachineDescription d;
+    vm->descriptionStruct(d);
+    
+    send(fd, &d, sizeof(MachineDescription), 0);
 }
 
+void _send_stream_memory(VirtualMachine *vm, int fd, MemoryRequest *m)
+{
+    reg_t mem_size;
+    size_t range = m->end - m->start;
+    size_t len = sizeof(MemoryRequest) + range;
+    const char *memory = (const char *)vm->readOnlyMemory(mem_size);
+    
+    // Bounds testing
+    if (mem_size < (m->start + range))
+    {
+        fprintf(stderr, "Memory request range out of bounds.\n");
+        return;
+    }
+    
+    // Allocate memory
+    char *final = (char *)malloc(len);
+    
+    // We might actually not be able to serve the request
+    if (!final)
+    {
+        fprintf(stderr, "Could not allocate memory request buffer.\n");
+        return;
+    }
+    
+    // Copy memory request into the response
+    for (int i = 0; i < sizeof(MemoryRequest); i++)
+        final[i] = ((char *)m)[i];
+    
+    // Copy the memory
+    for (int i = 0; i < range; i++)
+        final[i + sizeof(MemoryRequest)] = memory[i+m->start];
+    
+    // Send the request
+    send(fd, final, len, 0);
+    
+    // Clean up
+    free(final);
+}
 
 void _demux_stream_op(char *buf, size_t size, VirtualMachine *vm, int fd)
 {
     // Deal with commands sent in the stream format
-    int code = *(int *)buf;
+    char code = *(char *)buf;
     switch (code)
     {
         case kStatusMessage:
-        printf("Status Message Request.\n");
+        _send_stream_status(vm, fd);
+        break;
+        
+        case kMachineDescription:
+        _send_stream_description(vm, fd);
         break;
         
         case kMemoryRange:
-        printf("Memory Range Request.\n");
+        if (size < sizeof(MemoryRequest))
+        {
+            fprintf(stderr, "Memory request format error.\n");
+            return;
+        }
+        _send_stream_memory(vm, fd, (MemoryRequest *)buf);
         break;
         
         case kStreamHandshake:
@@ -376,7 +421,15 @@ void *serve( void *ptr )
                                 FD_SET(i, &stream);
                                 printf("Successful handshake with socket %d.\n", i);
                                 // Push status
+                                _send_stream_description(vm, i);
                                 _send_stream_status(vm, i);
+                                
+                                // Send the initial image of memory
+                                MemoryRequest m;
+                                m.type = kMemoryRange;
+                                m.start = 0;
+                                m.end = 256;
+                                _send_stream_memory(vm, i, &m);
                                 continue;
                             }
                         }

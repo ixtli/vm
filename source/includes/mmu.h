@@ -39,6 +39,12 @@ public:
     reg_t loadProgramImageFile(const char *path, reg_t to, bool writeBreak);
     bool writeOut(const char *path);
     
+    inline const reg_t *readOnlyMemory(reg_t &size)
+    {
+        size = _memory_size;
+        return (_memory);
+    }
+    
     // Operational: must return the timing
     cycle_t singleTransfer(const STFlags *f);
     cycle_t writeWord(reg_t addr, reg_t valueToSave);

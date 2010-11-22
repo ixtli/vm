@@ -88,6 +88,7 @@ class InterruptController;
 class ALU;
 struct ALUTimings;
 struct MachineStatus;
+struct MachineDescription;
 class MMU;
 class FPU;
 
@@ -107,9 +108,11 @@ public:
     // These are exposed because they are readonly, and thus
     // threadsafe
     void statusStruct(MachineStatus &s);
+    void descriptionStruct(MachineDescription &d);
     char *statusString(size_t &len);
     void readWord(reg_t addr, reg_t &val);
     void readRange(reg_t start, reg_t end, bool hex, char **ret);
+    const reg_t *readOnlyMemory(reg_t &size);
     
     // Helper methods that might be nice for other things...
     inline reg_t *selectRegister(char val)

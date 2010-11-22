@@ -16,14 +16,27 @@ enum ServerMessageTypes
 {
     kStreamHandshake,
     kStatusMessage,
-    kMemoryRange
+    kMemoryRange,
+    kMachineDescription
 };
 
+// Handshake format
 typedef struct StreamHandshake
 {
     char type;
 };
 
+// Structure that describes the settings to the virtual machine
+// these can not change while the vm is active and are described
+// by the configuration file
+typedef struct MachineDescription
+{
+    char type;
+    reg_t int_table_length, int_fxn_length;
+    reg_t mem_size;
+};
+
+// Structure to sent to describe the current state of the machine
 typedef struct MachineStatus
 {
     char type;
@@ -33,6 +46,13 @@ typedef struct MachineStatus
     reg_t pq[2];
     reg_t r[kGeneralRegisters];
     reg_t f[kFPRegisters];
+};
+
+// Format of a memory request message
+typedef struct MemoryRequest
+{
+    char type;
+    reg_t start, end;
 };
 
 // Forward class definitions
