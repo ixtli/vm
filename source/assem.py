@@ -579,9 +579,13 @@ class Assembler:
                 # begin formatting the binary string
                 bin = cond_code + self.branch[instruction];
                 
-                offset = abs(instruction_index - self.label[branch_loc]);
+                offset = instruction_index - self.label[branch_loc];
                 
-                print "Branch Offset: " + str(offset)
+                sign = "+"
+                if offset > 0:
+                    sign = "-"
+                
+                print "Branch Offset: " + sign + str(offset)
                 
                 # format the offset as 2's comp. and add it to the instruction
                 binoffset = self.decimal_to_binary(offset);

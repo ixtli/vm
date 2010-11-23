@@ -153,6 +153,7 @@ bool VirtualMachine::evaluateConditional()
     }
 }
 
+// This is really the better part of the "decode" phase
 cycle_t VirtualMachine::execute()
 {
     // return this to tell how many cycles the op took

@@ -12,14 +12,14 @@
 #define Z_CLEAR  !(_vm->_psr & kPSRZBit)
 
 // Macros for SETTING the PSR
-#define SET_N     (_vm->_psr &= kPSRNBit)
-#define CLEAR_N   (_vm->_psr ^= kPSRNBit)
-#define SET_V     (_vm->_psr &= kPSRVBit)
-#define CLEAR_V   (_vm->_psr ^= kPSRVBit)
-#define SET_C     (_vm->_psr &= kPSRCBit)
-#define CLEAR_C   (_vm->_psr ^= kPSRCBit)
-#define SET_Z     (_vm->_psr &= kPSRZBit)
-#define CLEAR_Z   (_vm->_psr ^= kPSRZBit)
+#define SET_N     (_vm->_psr |= kPSRNBit)
+#define CLEAR_N   (_vm->_psr &= ~kPSRNBit)
+#define SET_V     (_vm->_psr |= kPSRVBit)
+#define CLEAR_V   (_vm->_psr &= ~kPSRVBit)
+#define SET_C     (_vm->_psr |= kPSRCBit)
+#define CLEAR_C   (_vm->_psr &= ~kPSRCBit)
+#define SET_Z     (_vm->_psr |= kPSRZBit)
+#define CLEAR_Z   (_vm->_psr &= ~kPSRZBit)
 
 ALU::ALU(VirtualMachine *vm) : _vm(vm)
 {}
@@ -140,10 +140,9 @@ void ALU::shiftOffset(reg_t &offset, reg_t *val)
 
 cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
 {
-    cycle_t cycles = 0;
-    bool shift_carry = false;
     bool arithmetic = true;
     bool commit = true;
+    bool alu_carry = false;
     reg_t dest;
     reg_t *source = _vm->selectRegister(s);
     
@@ -159,16 +158,18 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
         case kADD:
         if (!I) shiftOffset(op2);
         dest = *source + op2;
+        // check if there would have been a carry out (a+b<a)
+        if (dest < *source) alu_carry = true;
         break;
         
         case kSUB:
-        arithmetic = true;
         if (!I) shiftOffset(op2);
         dest = *source - op2;
+        // check if there would have been a carry out (a-b>a)
+        if (dest > *source) alu_carry = true;
         break;
         
         case kMUL:
-        arithmetic = true;
         if (!I) shiftOffset(op2);
         dest = ((*source) * op2); //store lowest 32 bits on Rd
         //dest = ((*source) * op2) & 4294967295; //store lowest 32 bits on Rd
@@ -225,17 +226,19 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
         break;
         
         case kCMP:
-        arithmetic = false;
         commit = false;
         if (!I) shiftOffset(op2);
         dest = *source - op2;
+        // check if there would have been a carry out (a-b>a)
+        if (dest > *source) alu_carry = true;
         break;
         
         case kCMN:
-        arithmetic = false;
         commit = false;
         if (!I) shiftOffset(op2);
         dest = *source + op2;
+        // check if there would have been a carry out (a+b<a)
+        if (dest < *source) alu_carry = true;
         break;
         
         case kTST:
@@ -266,44 +269,38 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
     // We're done if we're not setting status bits
     // N.B.: Ignore the S bit if dest == PC, so that we dont get status bit
     //       confusion when you branch or something.
-    
-    // Reset status bits that are effected
-    // We probably don't want to do this ... 
-    //_vm->_psr &= ~NVCZ_MASK;
-    
-    // Set status bits
-    // There are two cases, logical and arithmetic
-    if ( !(s == kPCCode || d == kPCCode))
+    if (S && d != kPCCode)
     {
+        // Set status bits
+        // There are two cases, logical and arithmetic
         if (arithmetic)
         {
-            // Set V if there was an overflow into the 31st bit of the result
-            // My understanding of this is that if 31st bit was NOT
-            // set in *source, but is in *dest, set V
+            // the V flag in the CPSR will be set if an overflow occurs
+            // into bit 31 of the result
+            if (dest & kMSBMask != *source & kMSBMask)
+                SET_V;
+            else
+                CLEAR_V;
+            
+            // the N flag will be set to the value of bit 31 of the result
             if (dest & kMSBMask)
-            {
-                if (!(*source & kMSBMask))
-                    SET_V;
-                else
-                    CLEAR_V;
-                
-                // Also, set the negative bit
                 SET_N;
-            } else {
-                // Z flag set if dest is zero
-                if (dest == 0x0) {
-                    SET_Z;
-                } else {
-                    // TODO: I am not entirely sure this is right ...
-                    // As long as we're not zero, we might be super large
-                    if (dest < *source)
-                        SET_C;
-                    else
-                        CLEAR_C;
-                    
-                    CLEAR_Z;
-                }
-            }
+            else
+                CLEAR_N;
+            
+            // the Z flag will be set if and only if the result was zero
+            if (dest == 0x0)
+                SET_Z;
+            else
+                CLEAR_Z;
+                
+            // the C flag will be set to the carry out of bit 31 of the ALU
+            // NOTE: the following detection may not work correctly on
+            // 32bit machines
+            if (alu_carry)
+                SET_C;
+            else
+                CLEAR_C;
         
         } else {
             // We're a logical operation

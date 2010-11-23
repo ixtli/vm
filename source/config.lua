@@ -14,7 +14,7 @@ stack_size = 8
 break_count = 10
 
 -- Breakpoints (total should be LE to break_count)
-breakpoints = {}
+breakpoints = {0}
 
 -- Instruction timings
 
