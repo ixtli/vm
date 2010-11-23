@@ -31,7 +31,6 @@
 // going to be referenced from within a syscal?  Maybe?
 extern "C" {
     volatile sig_atomic_t terminate;
-    volatile sig_atomic_t stop;
 }
 
 // Init static mutex
@@ -645,6 +644,11 @@ void VirtualMachine::fetchInstruction()
     // always points to the NEXT instruction to be executed, that is
     // the location of the instruction ONE AHEAD of the ir register
     _pc += kRegSize;
+    
+    // Set this up to break out of possibly invalid jumps
+    if (_length_trap)
+        if (_pc > (_length_trap + _cs))
+            trap("Program unlikely to be this long.");
 }
 
 void VirtualMachine::executeInstruction()
@@ -655,6 +659,11 @@ void VirtualMachine::executeInstruction()
     
     // Do the op
     _cycle_count += execute();
+    
+    // Set this up to break out of possible infinite loops
+    if (_cycle_trap)
+        if (_cycle_count > _cycle_trap)
+            trap("Cycle count unlikely to be this large.");
 }
 
 void VirtualMachine::waitForClientInput()
@@ -668,12 +677,17 @@ void VirtualMachine::waitForClientInput()
     while (!ms->ready())
     { }
     
-    while (!terminate)
+    while (!terminate && !fex)
     {
         // Wait for something to happen
         pthread_mutex_lock(&server_mutex);
-        if (terminate)
-            continue;
+        // SIGINT may have been sent while we were asleep,
+        // or the server may have been told to step or cont
+        if (terminate || fex)
+        {
+            pthread_mutex_unlock(&server_mutex);
+            return;
+        }
         
         // If we get here, we have a job to do
         if (!operation) continue;
@@ -684,6 +698,18 @@ void VirtualMachine::waitForClientInput()
     }
 }
 
+void VirtualMachine::step()
+{
+    // Can't step if we're not broken.
+    if (fex) return;
+    
+    // Fetch the instruction
+    fetchInstruction();
+    
+    // Execute the instruction
+    executeInstruction();
+}
+
 void VirtualMachine::run()
 {
     printf("Starting execution at %#x\n", _pc);
@@ -691,7 +717,8 @@ void VirtualMachine::run()
     // Logic for the fetch -> execute cycle
     while (fex)
     {
-        // Check breakpoints on the CURRENT instruction, that is, before fetch
+        // Check breakpoints on the CURRENT instruction, that is, before
+        // advancing the pipeline
         for (int i = 0; i < _breakpoint_count; i++)
         {
             if (_breakpoints[i] == _pc && _pc != 0x0)
@@ -699,8 +726,12 @@ void VirtualMachine::run()
                 printf("Breakpoint %i at instruction %u (%#x).\n",
                     i, _breakpoints[i] - _cs, _breakpoints[i]);
                 
+                // stop execution
+                fex = false;
+                // sit around
                 waitForClientInput();
                 
+                // SIGINT could have happened during this time, so test for it
                 if (terminate)
                 {
                     printf("Exiting...\n");
@@ -709,33 +740,16 @@ void VirtualMachine::run()
             }
         }
         
+        // Fetch the instruction
         fetchInstruction();
         
-        // Set this up to break out of possibly invalid jumps
-        if (_length_trap)
-        {
-            if (_pc > (_length_trap + _cs))
-            {
-                trap("Program unlikely to be this long.");
-                continue;
-            }
-        }
-        
+        // Execute the instruction
         executeInstruction();
-        
-        // Set this up to break out of possible infinite loops
-        if (_cycle_trap)
-        {
-            if (_cycle_count > _cycle_trap)
-            {
-                trap("Cycle count unlikely to be this large.");
-                continue;
-            }
-        }
     }
     
-    // Idle and allow client to interact before exiting.
-    waitForClientInput();
+    // Idle and only close server after SIGINT
+    while (!terminate)
+        waitForClientInput();
     
     printf("Exiting...\n");
 }

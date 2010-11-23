@@ -17,7 +17,10 @@ enum ServerMessageTypes
     kStreamHandshake,
     kStatusMessage,
     kMemoryRange,
-    kMachineDescription
+    kMachineDescription,
+    kBreakMessage,
+    kContMessage,
+    kStepMessage
 };
 
 // Handshake format

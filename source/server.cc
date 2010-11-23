@@ -185,6 +185,36 @@ bool _demux_op(char *op, size_t size, VirtualMachine *vm, int fd)
             free(temp);
         }
         return (true);
+    } else if (strncmp(op, kContCommand, 4) == 0 ) {
+        if (!vm->fex)
+        {
+            char buf[] = "Continuing.\n";
+            send(fd, buf, strlen(buf), 0);
+            vm->fex = true;
+            // This is the incantation to stop waiting for destructive
+            // user input
+            pthread_mutex_unlock(&server_mutex);
+            pthread_mutex_lock(&server_mutex);
+        } else {
+            char buf[] = "Execution in progress.\n";
+            send(fd, buf, strlen(buf), 0);
+        }
+        return (true);
+    } else if (strncmp(op, kStepCommand, 4) == 0 ) {
+        if (!vm->fex)
+        {
+            char buf[] = "Stepping.\n";
+            send(fd, buf, strlen(buf), 0);
+            // The gigantic, scary assumption here is that
+            // if fex == false, then the virtual machine is waiting in
+            // waitForClientInput() for something to happen and thus
+            // this thread is free to muck around all it wants.
+            vm->step();
+        } else {
+            char buf[] = "Execution in progress.\n";
+            send(fd, buf, strlen(buf), 0);
+        }
+        return (true);
     }
     
     // Tokenize commands that require args

@@ -10,6 +10,8 @@
 #define kRangeCommand   "RANGE"
 #define kExecCommand    "EXEC"
 #define kStatCommand    "STATUS"
+#define kContCommand    "CONT"
+#define kStepCommand    "STEP"
 
 // Memory constants, in bytes
 #define kDefaultBreakCount 5
@@ -101,6 +103,7 @@ public:
     
     bool init(const char *config);
     void run();
+    void step();
     void installJumpTable(reg_t *data, reg_t size);
     void installIntFunctions(reg_t *data, reg_t size);
     bool loadProgramImage(const char *path, reg_t addr);
@@ -215,7 +218,6 @@ private:
 // read it from anywhere, which is assumed safe because of it's type.
 extern "C" {
     extern volatile sig_atomic_t terminate;
-    extern volatile sig_atomic_t stop;
 }
 
 extern pthread_mutex_t server_mutex;
