@@ -393,8 +393,6 @@ void *serve( void *ptr )
                             remoteIP, INET6_ADDRSTRLEN),
                             newfd);
                         
-                        // Send initial status message
-                        
                     }
                 } else {
                     // handle data from client

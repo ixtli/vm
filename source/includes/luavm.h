@@ -1,6 +1,8 @@
 #ifndef _LUAVM_H_
 #define _LUAVM_H_
 
+#include "global.h" // For size_t
+
 enum LuaError {
     kLuaNoError         = 0,
     kLuaUnexpectedType  = 1,
@@ -30,6 +32,8 @@ public:
     // Retrieve values from global state
     LuaError getGlobalField(const char *name, LuaFields field, void *ret);
     LuaError getTableField(const char *name, LuaFields field, void *ret);
+    LuaError getTableField(int index, LuaFields field, void *ret);
+    size_t lengthOfCurrentObject(); 
     LuaError openGlobalTable(const char *name);
     LuaError closeTable();
     

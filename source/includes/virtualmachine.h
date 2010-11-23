@@ -12,6 +12,7 @@
 #define kStatCommand    "STATUS"
 
 // Memory constants, in bytes
+#define kDefaultBreakCount 5
 #define kMinimumMemorySize 524288
 
 enum VMRegisterCounts {
@@ -99,7 +100,7 @@ public:
     ~VirtualMachine();
     
     bool init(const char *config);
-    void run(bool break_after_fex);
+    void run();
     void installJumpTable(reg_t *data, reg_t size);
     void installIntFunctions(reg_t *data, reg_t size);
     bool loadProgramImage(const char *path, reg_t addr);
@@ -142,6 +143,10 @@ public:
         }
     }
     
+    // Execution control
+    void addBreakpoint(reg_t addr);
+    reg_t deleteBreakpoint(reg_t index);
+    
     // Every other part of the machine can play with this at will
     // thus it shouldn't ever be read from except at the very
     // beginning of the execution phase
@@ -153,9 +158,17 @@ public:
     size_t opsize, respsize;
     //////////////////////////////////////////////////////////////
 private:
+    // Helper functions to keep code clean and relocatable
     bool configure(const char *c_path, ALUTimings &at);
     void resetSegmentRegisters();
     void resetGeneralRegisters();
+    void setMachineDefaults();
+    void relocateBreakpoints();
+    
+    // Fex cycle stuff
+    void fetchInstruction();
+    void waitForClientInput();
+    void executeInstruction();
     bool evaluateConditional();
     cycle_t execute();
     void eval(char *op);
@@ -175,6 +188,10 @@ private:
     bool _print_branch_offset, _print_instruction;
     reg_t _length_trap;
     cycle_t _cycle_trap;
+    
+    // execution control
+    reg_t _breakpoint_count;
+    reg_t *_breakpoints;
     
     // Machine info
     reg_t _mem_size, _read_cycles, _write_cycles, _stack_size;
@@ -198,6 +215,7 @@ private:
 // read it from anywhere, which is assumed safe because of it's type.
 extern "C" {
     extern volatile sig_atomic_t terminate;
+    extern volatile sig_atomic_t stop;
 }
 
 extern pthread_mutex_t server_mutex;

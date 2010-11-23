@@ -155,6 +155,24 @@ LuaError LuaVM::getTableField(const char *name, LuaFields field, void *ret)
     return (err);
 }
 
+LuaError LuaVM::getTableField(int index, LuaFields field, void *ret)
+{
+    if (!lua_istable(L, -1))
+        return (kLuaTableNotOpen);
+    
+    // Push the index
+    lua_pushinteger(L, index);
+    // Get the value for the index.
+    lua_gettable(L, -2);
+    
+    // Result is now at (L, -1)
+    LuaError err = getTopField(field, ret);
+    
+    // Clean and return
+    lua_pop(L, 1);
+    return (err);
+}
+
 LuaError LuaVM::openGlobalTable(const char *name)
 {
     if (!name) return (kLuaInvalidName);
@@ -174,4 +192,9 @@ LuaError LuaVM::closeTable()
     lua_pop(L, 1);
     
     return (kLuaNoError);
+}
+
+size_t LuaVM::lengthOfCurrentObject()
+{
+    return (lua_objlen(L, -1));
 }

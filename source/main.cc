@@ -79,8 +79,8 @@ int main(int argc, char *argv[])
         exit(1);
     }
     
-    // Run the VM and don't return after Fetch EXecute
-    vm->run(false);
+    // Run the VM
+    vm->run();
     
     // Clean up and exit
     delete vm;

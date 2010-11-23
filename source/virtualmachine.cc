@@ -31,6 +31,7 @@
 // going to be referenced from within a syscal?  Maybe?
 extern "C" {
     volatile sig_atomic_t terminate;
+    volatile sig_atomic_t stop;
 }
 
 // Init static mutex
@@ -245,7 +246,13 @@ cycle_t VirtualMachine::execute()
 
 VirtualMachine::VirtualMachine()
 {
+    // Set dynamically allocated variables to NULL so that
+    // we don't accidentally free them when destroying this class
+    // if an error occurred during allocation or they were
+    // intentionally not allocated.
     _program_file = NULL;
+    _dump_file = NULL;
+    _breakpoints = NULL;
 }
 
 VirtualMachine::~VirtualMachine()
@@ -256,6 +263,12 @@ VirtualMachine::~VirtualMachine()
     printf("Destroying virtual machine...\n");
     mmu->writeOut(_dump_file);
     delete mmu;
+    
+    if (_breakpoints)
+        free(_breakpoints);
+    
+    if (_dump_file)
+        free(_dump_file);
     
     if (_program_file)
         free(_program_file);
@@ -307,6 +320,26 @@ void VirtualMachine::resetGeneralRegisters()
         _pq[i] = 0;
 }
 
+void VirtualMachine::relocateBreakpoints()
+{
+    printf("Relocating breakpoints as offsets into _cs... ");
+    
+    // This simply adds _cs to each breakpoint and
+    // bounds checks them to make sure they're still within memory
+    for (int i = 0; i < _breakpoint_count; i++)
+    {
+        if (_breakpoints[i] != 0x0)
+            _breakpoints[i] += _cs;
+        
+        if (_breakpoints[i] > _mem_size)
+        {
+            fprintf(stderr, "Breakpoint %i relocated outside of memory.\n", i);
+            deleteBreakpoint(i);
+        }
+    }
+    printf("Done.\n");
+}
+
 bool VirtualMachine::configure(const char *c_path, ALUTimings &at)
 {
     
@@ -334,6 +367,14 @@ bool VirtualMachine::configure(const char *c_path, ALUTimings &at)
     err += lua->getGlobalField("read_cycles", kLUInt, &_read_cycles);
     err += lua->getGlobalField("write_cycles", kLUInt, &_write_cycles);
     
+    // If something required wasn't set, error out
+    if (err)
+    {
+        fprintf(stderr, "A required value was not set in the config file.\n");
+        delete lua;
+        return (true);
+    }
+    
     // Optional arguments
     lua->getGlobalField("stack_size", kLUInt, &_stack_size);
     lua->getGlobalField("swint_cycles", kLUInt, &_swint_cycles);
@@ -356,43 +397,55 @@ bool VirtualMachine::configure(const char *c_path, ALUTimings &at)
         lua->closeTable();
     }
     
-    // If 
-    if (err)
-    {
-        fprintf(stderr, "A required value was not set in the config file.\n");
-        delete lua;
-        return (true);
-    }
-    
     // Copy strings, because they wont exist after we free the lua VM
     _program_file = (char *)malloc(sizeof(char) * strlen(prog_temp) + 1);
     strcpy(_program_file, prog_temp);
     _dump_file = (char *)malloc(sizeof(char) * strlen(dump_temp) + 1);
     strcpy(_dump_file, dump_temp);
     
+    // Get breakpoint count
+    lua->getGlobalField("break_count", kLUInt, &_breakpoint_count);
+    // Allocate memory to hold them all
+    _breakpoints = (reg_t *)malloc(sizeof(reg_t) * _breakpoint_count);
+    if (lua->openGlobalTable("breakpoints") != kLuaUnexpectedType)
+    {
+        // Pull all the values out of it
+        reg_t c;
+        size_t max = lua->lengthOfCurrentObject();
+        
+        // Get all the breakpoints, remember lua lists are ONE-INDEXED
+        // so this for loop should look a little unnatural
+        for (int i = 1; i <= max; i++)
+        {
+            lua->getTableField(i, kLUInt, &c);
+            addBreakpoint(c << 2);
+        }
+    }
+    
     // clean up 
     delete lua;
     return (false);
 }
 
-bool VirtualMachine::init(const char *config)
+void VirtualMachine::setMachineDefaults()
 {
-    // Set defaults
+    // Most stuff gets set to zero
     _print_instruction = false;
     _print_branch_offset = false;
+    _cycle_count = 0;
+    _pc = 0;
+    _fpsr = 0;
     _length_trap = 0;
     _cycle_trap = 0;
     
-    // Configure using file
-    // Configure the VM using the config file
+    // Others have "hardcoded" defaults
+    _breakpoint_count = kDefaultBreakCount;
     _branch_cycles = kDefaultBranchCycles;
-    ALUTimings _aluTiming;
-    if (configure(config, _aluTiming))
-    {
-        fprintf(stderr, "VM configuration failed.\n");
-        return (true);
-    }
-    
+    _psr = kPSRDefault;
+}
+
+bool VirtualMachine::init(const char *config)
+{
     // Initialize server_mutex for MonitorServer
     pthread_mutex_init(&server_mutex, NULL);
     
@@ -408,6 +461,17 @@ bool VirtualMachine::init(const char *config)
     printf("Initializing virtual machine...\n");
     printf("Registers size: %lu bytes.\n", kRegSize);
     
+    // Set defaults
+    setMachineDefaults();
+    
+    // Configure the VM using the config file
+    ALUTimings _aluTiming;
+    if (configure(config, _aluTiming))
+    {
+        fprintf(stderr, "VM configuration failed.\n");
+        return (true);
+    }
+    
     // Start up ALU
     alu = new ALU(this);
     if (alu->init(_aluTiming)) return (true);
@@ -419,14 +483,6 @@ bool VirtualMachine::init(const char *config)
     // Init memory
     mmu = new MMU(this, _mem_size, _read_cycles, _write_cycles);
     if (mmu->init()) return (true);
-    
-    // Init cycle count
-    _cycle_count = 0;
-    
-    // Initialize required default machine state
-    _pc = 0;
-    _psr = kPSRDefault;
-    _fpsr = 0;
     
     // Load interrupt controller
     printf("Loading interrupt controller.\n");
@@ -444,6 +500,9 @@ bool VirtualMachine::init(const char *config)
     // run(true);
     // Load program right after function table
     loadProgramImage(_program_file, _int_table_size + _int_function_size);
+    
+    // Relocate breakpoints now that we have our environment loaded
+    relocateBreakpoints();
     
     // We can now start the Fetch EXecute cycle
     fex = true;
@@ -572,51 +631,34 @@ void VirtualMachine::trap(const char *error)
     execute();
 }
 
-void VirtualMachine::run(bool break_after_fex)
+void VirtualMachine::fetchInstruction()
 {
-    printf("Starting execution at %#x\n", _pc);
-    while (fex)
-    {
-        // Fetch PC instruction into IR and increment the pc
-        _cycle_count += mmu->readWord(_pc, _ir);
-        
-        // Print instruction if requested
-        if (_print_instruction)
-            printf("PC: %#X\t\t\t%#X\n", _pc, _ir);
-        
-        _pc += kRegSize;
-        
-        // Set this up to break out of possibly invalid jumps
-        if (_length_trap)
-        {
-            if (_pc > (_length_trap + _cs))
-            {
-                trap("Program unlikely to be this long.");
-                continue;
-            }
-        }
-        
-        // If the cond code precludes execution of the op, don't bother
-        if (!evaluateConditional())
-            continue;
-        
-        // Do the op
-        _cycle_count += execute();
-        
-        // Set this up to break out of possible infinite loops
-        if (_cycle_trap)
-        {
-            if (_cycle_count > _cycle_trap)
-            {
-                trap("Cycle count unlikely to be this large.");
-                continue;
-            }
-        }
-    }
+    // Fetch PC instruction into IR and increment the pc
+    _cycle_count += mmu->readWord(_pc, _ir);
     
-    // Should we bother to wait for server commands?
-    if (break_after_fex) return;
+    // Print instruction if requested
+    if (_print_instruction)
+        printf("PC: %#X\t\t\t%#X\n", _pc, _ir);
     
+    // Increment the program counter.
+    // NOTE: The effect of this action being taken here is that the PC
+    // always points to the NEXT instruction to be executed, that is
+    // the location of the instruction ONE AHEAD of the ir register
+    _pc += kRegSize;
+}
+
+void VirtualMachine::executeInstruction()
+{
+    // If the cond code precludes execution of the op, don't bother
+    if (!evaluateConditional())
+        return;
+    
+    // Do the op
+    _cycle_count += execute();
+}
+
+void VirtualMachine::waitForClientInput()
+{
     // Is the server even running?
     if (!ms->isRunning()) return;
     
@@ -640,6 +682,60 @@ void VirtualMachine::run(bool break_after_fex)
         // we're done
         pthread_mutex_unlock(&server_mutex);
     }
+}
+
+void VirtualMachine::run()
+{
+    printf("Starting execution at %#x\n", _pc);
+    
+    // Logic for the fetch -> execute cycle
+    while (fex)
+    {
+        // Check breakpoints on the CURRENT instruction, that is, before fetch
+        for (int i = 0; i < _breakpoint_count; i++)
+        {
+            if (_breakpoints[i] == _pc && _pc != 0x0)
+            {
+                printf("Breakpoint %i at instruction %u (%#x).\n",
+                    i, _breakpoints[i] - _cs, _breakpoints[i]);
+                
+                waitForClientInput();
+                
+                if (terminate)
+                {
+                    printf("Exiting...\n");
+                    return;
+                }
+            }
+        }
+        
+        fetchInstruction();
+        
+        // Set this up to break out of possibly invalid jumps
+        if (_length_trap)
+        {
+            if (_pc > (_length_trap + _cs))
+            {
+                trap("Program unlikely to be this long.");
+                continue;
+            }
+        }
+        
+        executeInstruction();
+        
+        // Set this up to break out of possible infinite loops
+        if (_cycle_trap)
+        {
+            if (_cycle_count > _cycle_trap)
+            {
+                trap("Cycle count unlikely to be this large.");
+                continue;
+            }
+        }
+    }
+    
+    // Idle and allow client to interact before exiting.
+    waitForClientInput();
     
     printf("Exiting...\n");
 }
@@ -671,4 +767,56 @@ void VirtualMachine::readWord(reg_t addr, reg_t &val)
 void VirtualMachine::readRange(reg_t start, reg_t end, bool hex, char **ret)
 {
     _cycle_count += mmu->readRange(start, end, hex, ret);
+}
+
+void VirtualMachine::addBreakpoint(reg_t addr)
+{
+    // Error check
+    if (!_breakpoints || !_breakpoint_count) return;
+    
+    if (addr == 0x0)
+    {
+        fprintf(stderr, "Cannot set breakpoint at 0x0. Ignoring.\n");
+        return;
+    }
+    
+    if (addr >= _mem_size)
+    {
+        fprintf(stderr, "Attempt to set breakpoint outside memory: %#x.\n", addr);
+        return;
+    }
+    
+    for (int i = 0; i < _breakpoint_count; i++)
+    {
+        if (_breakpoints[i] == 0x0)
+        {
+            _breakpoints[i] = addr;
+            printf("Breakpoint %i set: %#x\n", i, addr);
+            return;
+        }
+    }
+    
+    fprintf(stderr, "Could not set breakpoint: Array full.");
+}
+
+reg_t VirtualMachine::deleteBreakpoint(reg_t index)
+{
+    if (!_breakpoints || !_breakpoint_count) return (0x0);
+    
+    if (index >= _breakpoint_count)
+    {
+        fprintf(stderr, "Delete breakpoint: Bounds exception.\n");
+        return (0x0);
+    }
+    
+    if (_breakpoints[index] == 0x0)
+    {
+        fprintf(stderr, "No breakpoint at index %u\n.", index);
+        return (0x0);
+    }
+    
+    reg_t ret = _breakpoints[index];
+    _breakpoints[index] = 0x0;
+    printf("Breakpoints %u deleted.\n", index);
+    return (ret);
 }
