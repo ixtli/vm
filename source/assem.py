@@ -342,7 +342,7 @@ class Assembler:
                     # as a shift
                     op2 = self.decToBin(0,10)
                     if len(line) > 0:
-                        op2 = movShift(line)
+                        op2 = self.movShift(line)
                         if op2 == None:
                             return op2
                     
