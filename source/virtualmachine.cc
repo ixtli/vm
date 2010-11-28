@@ -12,6 +12,7 @@
 #include "includes/fpu.h"
 #include "includes/util.h"
 #include "includes/luavm.h"
+#include "includes/pipeline.h"
 
 // Macros for checking the PSR
 #define N_SET     (_psr & kPSRNBit)
@@ -280,11 +281,11 @@ bool VirtualMachine::loadProgramImage(const char *path, reg_t addr)
     
     // Allocate stack space before code
     _ss = addr + (_stack_size << 2);
-    printf("%u words of stack allocated at %#x\n", _stack_size, _ss);
+    printf("Program stack: %u words allocated at %#x\n", _stack_size, _ss);
     
     // Code segment starts right after it
     _cs = _ss + 1;
-    printf("Code segment begins at %#x\n", _cs);
+    printf("Code segment: %#x\n", _cs);
     
     // Load file into memory at _cs
     reg_t image_size = mmu->loadProgramImageFile(path, _cs, true);
@@ -293,7 +294,7 @@ bool VirtualMachine::loadProgramImage(const char *path, reg_t addr)
     _ds = _cs + image_size;
     
     // Report
-    printf("Data segment begins at %#x\n", _ds);
+    printf("Data segment: %#x\n", _ds);
     
     // Initialize program state
     resetGeneralRegisters();
@@ -450,7 +451,6 @@ bool VirtualMachine::init(const char *config)
     pthread_mutex_init(&server_mutex, NULL);
     
     // Initialize command and status server
-    printf("Initializing server... \n");
     ms = new MonitorServer(this);
     if (ms->init())
         return (true);
@@ -458,8 +458,8 @@ bool VirtualMachine::init(const char *config)
         return (true);
     
     // Initialize actual machine
-    printf("Initializing virtual machine...\n");
-    printf("Registers size: %lu bytes.\n", kRegSize);
+    printf("Initializing virtual machine: ");
+    printf("%i %lu-byte registers.\n", kVMRegisterMax, kRegSize);
     
     // Set defaults
     setMachineDefaults();
@@ -484,8 +484,11 @@ bool VirtualMachine::init(const char *config)
     mmu = new MMU(this, _mem_size, _read_cycles, _write_cycles);
     if (mmu->init()) return (true);
     
+    // Init instruction pipeline
+    pipe = new InstructionPipeline((reg_t)kDefaultPipelineStages, this);
+    if (pipe->init()) return (true);
+    
     // Load interrupt controller
-    printf("Loading interrupt controller.\n");
     icu = new InterruptController(this, _swint_cycles);
     icu->init();
     
@@ -511,6 +514,7 @@ bool VirtualMachine::init(const char *config)
     return (false);
 }
 
+// Evaluate a destructive client operation, like write word
 void VirtualMachine::eval(char *op)
 {
     // We need to parse arguments
@@ -634,7 +638,7 @@ void VirtualMachine::trap(const char *error)
 void VirtualMachine::fetchInstruction()
 {
     // Fetch PC instruction into IR and increment the pc
-    _cycle_count += mmu->readWord(_pc, _ir);
+    incCycleCount(mmu->readWord(_pc, _ir));
     
     // Print instruction if requested
     if (_print_instruction)
@@ -659,12 +663,7 @@ void VirtualMachine::executeInstruction()
         return;
     
     // Do the op
-    _cycle_count += execute();
-    
-    // Set this up to break out of possible infinite loops
-    if (_cycle_trap)
-        if (_cycle_count > _cycle_trap)
-            trap("Cycle count unlikely to be this large.");
+    incCycleCount(execute());
 }
 
 void VirtualMachine::waitForClientInput()
@@ -757,16 +756,16 @@ void VirtualMachine::run()
 
 void VirtualMachine::installJumpTable(reg_t *data, reg_t size)
 {
-    mmu->writeBlock(0x0, data, size);
+    incCycleCount(mmu->writeBlock(0x0, data, size));
     _int_table_size = size;
-    printf("%ub interrupt jump table at 0x0.\n", size);
+    printf("(%ub table @ 0x0) ", size);
 }
 
 void VirtualMachine::installIntFunctions(reg_t *data, reg_t size)
 {
-    mmu->writeBlock(_int_table_size, data, size);
+    incCycleCount(mmu->writeBlock(_int_table_size, data, size));
     _int_function_size = size;
-    printf("%ub interrupt functions at %#x.\n", size, (reg_t)_int_table_size);
+    printf("(%ub functions @ %#x) ", size, (reg_t)_int_table_size);
 }
 
 void VirtualMachine::shiftOffset(reg_t &offset, reg_t *val)
@@ -776,12 +775,12 @@ void VirtualMachine::shiftOffset(reg_t &offset, reg_t *val)
 
 void VirtualMachine::readWord(reg_t addr, reg_t &val)
 {
-    _cycle_count += mmu->readWord(addr, val);
+    incCycleCount(mmu->readWord(addr, val));
 }
 
 void VirtualMachine::readRange(reg_t start, reg_t end, bool hex, char **ret)
 {
-    _cycle_count += mmu->readRange(start, end, hex, ret);
+    incCycleCount(mmu->readRange(start, end, hex, ret));
 }
 
 void VirtualMachine::addBreakpoint(reg_t addr)

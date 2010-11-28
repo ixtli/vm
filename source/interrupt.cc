@@ -22,14 +22,21 @@ InterruptController::~InterruptController()
 
 bool InterruptController::init()
 {
+    printf("Loading interrupt controller... ");
+    
     // Return true if instantiation failed
-    if (!_vm) return (true);
+    if (!_vm)
+    {
+        printf("invalid parameters.\n");
+        return (true);
+    }
     
     if (!_swint_cycles) _swint_cycles = kDefaultSWIntCycles;
     
     _vm->installJumpTable(jump_table, sizeof(jump_table));
     _vm->installIntFunctions(functions, sizeof(functions));
     
+    printf("Done.\n");
     return (false);
 }
 

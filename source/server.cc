@@ -42,8 +42,16 @@ MonitorServer::~MonitorServer()
 
 bool MonitorServer::init()
 {
-    if (!_vm) return (true);
+    printf("Initializing server... ");
+    if (!_vm)
+    {
+        printf("invalid arguments.\n");
+        return (true);
+    }
+    
     _ready = false;
+    
+    printf("Done.\n");
     return (false);
 }
 
@@ -63,10 +71,16 @@ bool MonitorServer::ready()
 int MonitorServer::run()
 {
     // spawn the listener thread, explicitly joinable.
+    printf("Detatching server thread... ");
     pthread_attr_t attr;
     int ret = pthread_attr_init(&attr);
     ret = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
     ret = pthread_create(&_listener, &attr, serve, (void *)_vm);
+    
+    if (ret)
+        printf("failed: %i\n", ret);
+    else
+        printf("Done.\n");
     
     return (ret);
 }

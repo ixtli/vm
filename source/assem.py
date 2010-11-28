@@ -579,18 +579,23 @@ class Assembler:
                 # begin formatting the binary string
                 bin = cond_code + self.branch[instruction];
                 
-                offset = instruction_index - self.label[branch_loc];
+                print str(self.label[branch_loc]) + " " + str(instruction_index)
+                offset = self.label[branch_loc] - instruction_index;
                 
-                sign = "+"
-                if offset > 0:
-                    sign = "-"
+                mask = 0xFFFFFF
+                if (abs(offset) > mask):
+                    print("Warning: Branch offset greated than 24-bit max.")
                 
-                print "Branch Offset: " + sign + str(offset)
+                print "Branch Offset: " + str(offset)
                 
-                # format the offset as 2's comp. and add it to the instruction
-                binoffset = self.decimal_to_binary(offset);
-                actual_offset = int(binoffset, 2)-(1<<24);
-                bin += self.decimal_to_binary(abs(actual_offset));
+                if offset < 0 :
+                    # Deal with a negative offset
+                    offset -=1;
+                    offset ^= mask;
+                    bin += "1" + self.decToBin(offset, 23);
+                else:
+                    # Just pack in the number
+                    bin += "0" + self.decToBin(offset, 23);
             else:
                 print "Invalid operation '" + instruction + "'.";
                 bin = self.condition_codes["nv"] + self.decToBin(0, 28)

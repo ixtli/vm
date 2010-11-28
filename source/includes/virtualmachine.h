@@ -16,6 +16,7 @@
 // Memory constants, in bytes
 #define kDefaultBreakCount 5
 #define kMinimumMemorySize 524288
+#define kDefaultPipelineStages 5
 
 enum VMRegisterCounts {
     kGeneralRegisters = 16,
@@ -57,7 +58,7 @@ enum VMRegisterCodes {
     kR8Code, kR9Code, kR10Code, kR11Code, kR12Code, kR13Code, kR14Code, kR15Code,
     kPQ0Code, kPQ1Code, kPCCode, kPSRCode, kCSCode, kDSCode, kSSCode, kFPSRCode,
     kFPR0Code, kFPR1Code, kFPR2Code, kFPR3Code, kFPR4Code, kFPR5Code, kFPR6Code,
-    kFPR7Code
+    kFPR7Code, kVMRegisterMax
 };
 
 enum VMComponantTimings {
@@ -86,14 +87,16 @@ enum BranchMasks {
 };
 
 // Forward class and struct definitions
-class MonitorServer;
-class InterruptController;
-class ALU;
 struct ALUTimings;
 struct MachineStatus;
 struct MachineDescription;
+
+class MonitorServer;
+class InterruptController;
+class ALU;
 class MMU;
 class FPU;
+class InstructionPipeline;
 
 class VirtualMachine
 {
@@ -146,6 +149,16 @@ public:
         }
     }
     
+    inline void incCycleCount(cycle_t val)
+    {
+        _cycle_count += val;
+        
+        // Set this up to break out of possible infinite loops
+        if (_cycle_trap)
+            if (_cycle_count > _cycle_trap)
+                trap("Cycle count unlikely to be this large.");
+    }
+    
     // Execution control
     void addBreakpoint(reg_t addr);
     reg_t deleteBreakpoint(reg_t index);
@@ -181,6 +194,7 @@ private:
     MMU *mmu;
     ALU *alu;
     FPU *fpu;
+    InstructionPipeline *pipe;
     InterruptController *icu;
     
     // Server
