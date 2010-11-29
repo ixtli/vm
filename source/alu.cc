@@ -158,7 +158,7 @@ cycle_t ALU::dataProcessing(DPFlags &instruction)
     bool commit = true;
     bool alu_carry = false;
     reg_t dest;
-    reg_t source = _vm->selectRegister(instruction.s);
+    reg_t source = _vm->selectRegister(instruction.rs);
     
     switch (instruction.op)
     {
@@ -345,10 +345,15 @@ cycle_t ALU::singleTransfer(STFlags &f)
     
     reg_t computed_source = base;
     
+    // Preserve carry when doing single transfer
+    bool c = C_SET;
+    
     // Immediate means that the offset is composed of
     if (f.i)
         // Use the ALU barrel shifter here
         shiftOffset(offset);
+    
+    if (c) SET_C;
     
     if (f.p)
     {

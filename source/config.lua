@@ -4,7 +4,7 @@ memory_dump = "memory.dump"
 print_instruction = true
 print_branch_offset = true
 program_length_trap = 0x50
-machine_cycle_trap = 3000
+machine_cycle_trap = 30000
 
 -- YAAA Machine Description
 
@@ -14,10 +14,11 @@ stack_size = 8
 break_count = 10
 
 -- Pipeline configuration
-stages = 5
+stages = 4
 
 -- Breakpoints (total should be LE to break_count)
-breakpoints = {4}
+-- (NOTE: this is the line number of the LAST instruction you want to execute)
+breakpoints = {}
 
 -- Instruction timings
 

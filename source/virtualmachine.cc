@@ -762,11 +762,7 @@ void VirtualMachine::writeBack(PipelineData *d)
         return;
     }
     
-    if (pipe->isSquashed())
-    {
-        pipe->unlock();
-        return;
-    }
+    if (!d->executes) return;
     
     switch (d->instruction_class)
     {
@@ -793,9 +789,10 @@ void VirtualMachine::writeBack(PipelineData *d)
         break;
         
         case kFloatingPoint:
-            *(demuxRegID(d->flags.fp.s + kFPR0Code)) = d->output0;
-            *(demuxRegID(d->flags.fp.d + kFPR0Code)) = d->output1;
-            // TODO: add another output register
+        *(demuxRegID(d->flags.fp.s + kFPR0Code)) = d->output0;
+        *(demuxRegID(d->flags.fp.d + kFPR0Code)) = d->output1;
+        break;
+        
         default:
         break;
     }
@@ -864,13 +861,20 @@ void VirtualMachine::decodeInstruction(PipelineData *d)
             d->flags.st.rd = (_ir & kSTDestMask) >> 10;
             d->flags.st.offset = (_ir & kSTOffsetMask);
             
-            // wait on dest register if it's a load
-            if (d->flags.st.l)
-                pipe->waitOnRegister(d->flags.st.rd);
-            
-            // wait on base if there is writeback
+            // lock base if there is writeback
             if (d->flags.st.w)
                 pipe->waitOnRegister(d->flags.st.rs);
+            
+            if (!d->flags.st.i)
+            {
+                pipe->waitOnRegister(
+                    (d->flags.st.offset & kShiftRmMask) >> 3);
+                if (d->flags.st.offset & kShiftType)
+                {
+                    pipe->waitOnRegister(
+                        (d->flags.st.offset & kShiftRsMask) >> 7);
+                }
+            }
             
         } else {
             // Only other case is a data processing op
@@ -883,17 +887,28 @@ void VirtualMachine::decodeInstruction(PipelineData *d)
             d->flags.dp.rd = ( (_ir & kDPDestMask) >> 10);
             d->flags.dp.offset = ( (_ir & kDPOperandTwoMask) );
             
-            if (d->flags.dp.op == kMUL)
-            {
-                // wait on PQ registers if it's a mul
-                pipe->waitOnRegister(kPQ0Code);
-                pipe->waitOnRegister(kPQ1Code);
-            } else {
-                // wait on dest register
-                pipe->waitOnRegister(d->flags.st.rd);
-            }
-        
+            pipe->waitOnRegister(d->flags.dp.rs);
             
+            // we might be shifting by register vals
+            if (!d->flags.dp.i)
+            {
+                if (d->flags.dp.op == kMOV)
+                {
+                    if (d->flags.dp.offset & kShiftType)
+                    {
+                        pipe->waitOnRegister(
+                            (d->flags.dp.offset & kMOVShiftRs) >> 3);
+                    }
+                } else {
+                    pipe->waitOnRegister(
+                        (d->flags.dp.offset & kShiftRmMask) >> 3);
+                    if (d->flags.dp.offset & kShiftType)
+                    {
+                        pipe->waitOnRegister(
+                            (d->flags.dp.offset & kShiftRsMask) >> 7);
+                    }
+                }
+            }
         }
         return;
     }
@@ -936,8 +951,8 @@ void VirtualMachine::decodeInstruction(PipelineData *d)
         d->flags.fp.m = ((_ir & kFPmMask) >> 8);
         
         // TODO: Optimize this
-        pipe->waitOnRegister(d->flags.fp.s + kFPR0Code);
-        pipe->waitOnRegister(d->flags.fp.d + kFPR0Code);
+        pipe->waitOnRegister(d->flags.fp.n + kFPR0Code);
+        pipe->waitOnRegister(d->flags.fp.m + kFPR0Code);
         
         return;
     }
@@ -959,26 +974,30 @@ void VirtualMachine::executeInstruction(PipelineData *d)
     // If the cond code precludes execution of the op, don't bother
     evaluateConditional(d);
     
-    if (!d->executes)
-    {
-        pipe->squash();
-        return;
-    }
-    
-    pipe->lock();
-    
     // Print instruction if requested
     if (_print_instruction)
         printf("PC: %#X\t\t\t%#X\n", d->location, d->instruction);
     
-    if (!d->instruction)
+    if (!d->executes)
     {
-        pipe->printState();
+        printf("deciding not to execute.\n");
+        return;
     }
     
     switch (d->instruction_class)
     {
         case kDataProcessing:
+        
+        if (d->flags.dp.op == kMUL)
+        {
+            // lock PQ registers if it's a mul
+            pipe->lock(kPQ0Code);
+            pipe->lock(kPQ1Code);
+        } else {
+            // lock dest register
+            pipe->lock(d->flags.st.rd);
+        }
+        
         incCycleCount(alu->dataProcessing(d->flags.dp));
         
         // Save emitted values
@@ -991,6 +1010,15 @@ void VirtualMachine::executeInstruction(PipelineData *d)
         break;
         
         case kSingleTransfer:
+        
+        // lock dest register if it's a load
+        if (d->flags.st.l)
+            pipe->lock(d->flags.st.rd);
+        
+        // lock base if there is writeback
+        if (d->flags.st.w)
+            pipe->lock(d->flags.st.rs);
+        
         incCycleCount(alu->singleTransfer(d->flags.st));
         
         // Save emitted values
@@ -1001,15 +1029,10 @@ void VirtualMachine::executeInstruction(PipelineData *d)
         
         case kBranch:
         // Store current pc in the link register (r15)
-        if (d->flags.b.link) _r[15] = _pc;
-        
-        // If we need help debugging
-        if (_print_branch_offset) printf("BRANCH: %i\n", d->flags.b.offset);
-        
-        // Add the computed address to the pc and make sure it's not < 0
-        d->flags.b.offset += (signed int)_pc;
-        
+        if (d->flags.b.link) _r[15] = d->location;
         // Don't jump to a negative offset
+        if (_print_branch_offset) printf("BRANCH: %i\n", d->flags.b.offset);
+        d->flags.b.offset += ((signed int)d->location);
         if (d->flags.b.offset < 0)
             _pc = 0;
         else
@@ -1019,12 +1042,16 @@ void VirtualMachine::executeInstruction(PipelineData *d)
         break;
         
         case kInterrupt:
-        _r[15] = _pc;
+        _r[15] = d->location;
         icu->swint(d->flags.i);
         pipe->invalidate();
         break;
         
         case kFloatingPoint:
+        
+        pipe->lock(d->flags.fp.s);
+        pipe->lock(d->flags.fp.d);
+        
         incCycleCount(fpu->execute(d->flags.fp));
         
         // Save emitted values
@@ -1049,6 +1076,8 @@ void VirtualMachine::memoryAccess(PipelineData *d)
         trap("Invalid memory access parameter.\n");
         return;
     }
+    
+    if (!d->executes) return;
     
     switch (d->instruction_class)
     {

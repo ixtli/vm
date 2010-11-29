@@ -579,8 +579,8 @@ class Assembler:
                 # begin formatting the binary string
                 bin = cond_code + self.branch[instruction];
                 
-                print str(self.label[branch_loc]) + " " + str(instruction_index)
                 offset = self.label[branch_loc] - instruction_index;
+                print str(offset)
                 
                 mask = 0xFFFFFF
                 if (abs(offset) > mask):
@@ -590,8 +590,6 @@ class Assembler:
                 
                 if offset < 0 :
                     # Deal with a negative offset
-                    offset -=1;
-                    offset ^= mask;
                     bin += "1" + self.decToBin(offset, 23);
                 else:
                     # Just pack in the number

@@ -92,7 +92,7 @@ public:
     
     // Pipe manipulation
     bool cycle();
-    bool lock();
+    bool lock(char reg);
     void unlock();
     bool waitOnRegister(char reg);
     bool isSquashed();
@@ -112,9 +112,11 @@ private:
         inline void clear()
         {
             squash = 0; bubble = 0; unused = 0;
+            lock = 0x0;
         }
 
         char squash:1, bubble:1, unused:6;
+        reg_t lock;
     };
     
     char _stages, _stages_in_use;

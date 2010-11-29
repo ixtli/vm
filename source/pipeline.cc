@@ -155,6 +155,15 @@ bool InstructionPipeline::cycle()
     {
         // Set current stage index
         _current_stage = i;
+        
+        // squashed instructions become bubbles
+        if (_flags[i].squash)
+        {
+            _flags[i].clear();
+            _wait[i] = 0x0;
+            _flags[i].bubble = 1;
+        }
+        
         // Call the function with data only if it's not a bubble
         if (!_flags[i].bubble)
             (_vm->*_inst[i])(_data[i]);
@@ -205,8 +214,25 @@ bool InstructionPipeline::cycle()
                 _data[0] = _data[i];
                 // For deallocation safety
                 _data[i] = NULL;
+            } else if (_flags[i].bubble) {
+                // Pop the bubble
+                for (int j = 0; j < _stages_in_use -1; j++)
+                {
+                    if (!_data[j])
+                    {
+                        if (!_flags[j].bubble)
+                        {
+                            fprintf(stderr, "Unstable pipeline.\n");
+                            return (true);
+                        }
+                        _data[j] = _data[i];
+                        _data[i] = NULL;
+                        break;
+                    }
+                }
             }
         }
+        
     }
     
     // Doing this takes one machine cycle.
@@ -221,13 +247,10 @@ bool InstructionPipeline::cycle()
 void InstructionPipeline::invalidate()
 {
     // Squash all instruction after the current one
-    for (int i = 0; i < _stages_in_use; i++)
+    for (int i = 0; i < _current_stage; i++)
     {
-        if (i != _current_stage)
-        {
-            _flags[i].squash = 1;
-            _instructions_invalidated++;
-        }
+        _flags[i].squash = 1;
+        _instructions_invalidated++;
     }
     
     _invalidations++;
@@ -245,24 +268,26 @@ bool InstructionPipeline::waitOnRegister(char reg)
     _wait[_current_stage] |= (1 << reg);
 }
 
-bool InstructionPipeline::lock()
+bool InstructionPipeline::lock(char reg)
 {
     // Trap on register attempting to double lock
-    if (_registers_in_use & _wait[_current_stage])
+    if (_registers_in_use & (1 << reg))
     {
         fprintf(stderr, "Register double lock!\n");
         return (false);
     }
     
     // Lock the registers
-    _registers_in_use |= _wait[_current_stage];
+    _registers_in_use |= (1 << reg);
+    _flags[_current_stage].lock |= (1 << reg);
     return (true);
 }
 
 void InstructionPipeline::unlock()
 {
     // Unlock the register
-    _registers_in_use ^= _wait[_current_stage];
+    _registers_in_use ^= _flags[_current_stage].lock;
+    _flags[_current_stage].lock = 0x0;
 }
 
 // Debugging
