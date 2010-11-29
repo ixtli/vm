@@ -19,14 +19,13 @@ bool FPU::init()
 
 cycle_t FPU::execute(const FPFlags &flags)
 {
-    printf("=================here\n");
     cycle_t cycles = 0;
     bool shift_carry = false;
     bool arithmetic = false;
     reg_t fpd = _vm->selectRegister(flags.d);
     reg_t fpn = _vm->selectRegister(flags.n);
     reg_t fpm = _vm->selectRegister(flags.m);
-    
+
     //  printf("%u %u %u %u", *_fps, *_fpd, *_fpn, *_fpm);
     
     
@@ -60,6 +59,6 @@ cycle_t FPU::execute(const FPFlags &flags)
         default:
             break;
     }
-    
+    fpd = _output;   
     return (cycles);
 }
