@@ -37,212 +37,112 @@ extern "C" {
 // Init static mutex
 pthread_mutex_t server_mutex;
 
+reg_t *VirtualMachine::demuxRegID(const char id)
+{
+    if (id < kPQ0Code)
+        // This is a general register
+        return (&_r[id]);
+    
+    if (id > kFPSRCode)
+        // This is an fpu register
+        return (&_fpr[id - kFPR0Code]);
+    
+    switch (id)
+    {
+        case kPSRCode:
+        return (&_psr);
+        case kPQ0Code:
+        return (&_pq[0]);
+        case kPQ1Code:
+        return (&_pq[1]);
+        case kPCCode:
+        return (&_pc);
+        case kFPSRCode:
+        return (&_fpsr);
+        default:
+        trap("Invalid register selection.\n");
+        return (0);
+    }
+}
+
 const reg_t *VirtualMachine::readOnlyMemory(reg_t &size)
 {
     return (mmu->readOnlyMemory(size));
 }
 
-bool VirtualMachine::evaluateConditional()
+void VirtualMachine::evaluateConditional(PipelineData *d)
 {
-    // Evaluate the condition code in the IR
-    // Get the most significant nybble of the instruction by masking
-    reg_t cond = 0xF0000000;
-    cond = _ir & cond;
+    d->executes = true;
     
-    // Shift the MSN into the LSN 
-    cond = cond >> 28;
-    
-    // Test for two conditions that have nothing to do with the PSR
-    // Always (most common case)
-    if (cond == kCondAL)
-        return (true);
-    
-    // Never ("no op")
-    if (cond == kCondNV)
-        return (false);
-    
-    switch (cond)
+    switch (d->condition_code)
     {
+        case kCondAL:           // Always
+        return;
+        
         case kCondEQ:           // Equal
-        if (Z_SET)                // Z bit set
-            return (true);
-        else
-            return (false);
+        if (Z_SET) return;      // Z bit set
+        break;
         
         case kCondNE:           // Not equal
-        if (Z_CLEAR)              // Z bit clear
-            return (false);
-        else
-            return (true);
-
+        if (Z_CLEAR) return;    // Z bit clear
+        break;
+        
         case kCondCS:           // unsigned higher or same
-        if (C_SET)
-            return (true);
-        else
-            return (false);
-
+        if (C_SET) return;
+        break;
+        
         case kCondCC:           // Unsigned lower
-        if (C_CLEAR)
-            return (false);
-        else
-            return (true);
-
+        if (C_CLEAR) return;
+        break;
+        
         case kCondMI:           // Negative
-        if (N_SET)
-            return (true);
-        else
-            return (false);
-
+        if (N_SET) return;
+        break;
+        
         case kCondPL:           // Positive or Zero
-        if (N_CLEAR)
-            return (false);
-        else
-            return (true);
-
+        if (N_CLEAR) return;
+        break;
+        
         case kCondVS:           // Overflow
-        if (V_SET)
-            return (true);
-        else
-            return (false);
-
+        if (V_SET) return;
+        break;
+        
         case kCondVC:           // No Overflow
-        if (V_CLEAR)
-            return (true);
-        else
-            return (false);
-
+        if (V_CLEAR) return;
+        break;
+        
         case kCondHI:           // Unsigned Higher
-        if (C_SET && V_CLEAR)
-            return (true);
-        else
-            return (false);
-
+        if (C_SET && V_CLEAR) return;
+        break;
+        
         case kCondLS:           // Unsigned lower or same
-        if (C_CLEAR || Z_SET)
-            return (true);
-        else
-            return (true);
-
+        if (C_CLEAR || Z_SET) return;
+        break;
+        
         case kCondGE:           // Greater or Equal
-        if ((N_SET && V_CLEAR) || (N_CLEAR && V_CLEAR))
-            return (true);
-        else
-            return (false);
-
+        if ((N_SET && V_CLEAR) || (N_CLEAR && V_CLEAR)) return;
+        break;
+        
         case kCondLT:           // Less Than
-        if ((N_SET && V_CLEAR) || (N_CLEAR && V_SET))
-            return (true);
-        else
-            return (false);
-
+        if ((N_SET && V_CLEAR) || (N_CLEAR && V_SET)) return;
+        break;
+        
         case kCondGT:           // Greater Than
-        // Z clear, AND EITHER N set AND V set, OR N clear AND V clear
-        if (Z_CLEAR && (((N_SET && V_SET))||(N_CLEAR && V_CLEAR)))
-            return (true);
-        else
-            return (false);
-
+        // Z clear, AND "EITHER" N set AND V set, OR N clear AND V clear
+        if (Z_CLEAR && (((N_SET && V_SET))||(N_CLEAR && V_CLEAR))) return;
+        break;
+        
         case kCondLE:           // Less than or equal
         // Z set, or N set and V clear, or N clear and V set
-        if (Z_CLEAR || (N_SET && V_CLEAR) || (N_CLEAR && V_SET))
-            return (true);
-        else
-            return (false);
-
-        default:
-        return (false);
-    }
-}
-
-// This is really the better part of the "decode" phase
-cycle_t VirtualMachine::execute()
-{
-    // return this to tell how many cycles the op took
-    cycle_t cycles = 0;
-    // Parse the Operation Code
-    // Test to see if it has a 0 in the first place of the opcode
-    if ((_ir & 0x08000000) == 0x0)
-    {
-        // We're either a data processing or single transfer operation
-        // Test to see if there is a 1 in the second place of the opcode
-        if (_ir & kSingleTransferMask)
-        {
-            // We're a single transfer
-            STFlags f;
-            f.I = (_ir & kSTIFlagMask) ? true : false;
-            f.L = (_ir & kSTLFlagMask) ? true : false;
-            f.W = (_ir & kSTWFlagMask) ? true : false;
-            f.B = (_ir & kSTBFlagMask) ? true : false;
-            f.U = (_ir & kSTUFlagMask) ? true : false;
-            f.P = (_ir & kSTPFlagMask) ? true : false;
-            f.rs = (_ir & kSTSourceMask) >> 15;
-            f.rd = (_ir & kSTDestMask) >> 10;
-            f.offset = (_ir & kSTOffsetMask);
-            return (mmu->singleTransfer(&f));
-        } else {
-            // Only other case is a data processing op
-            // extract all operands and flags
-            bool I = (_ir & kDPIFlagMask) ? true : false;
-            bool S = (_ir & kDPSFlagMask) ? true : false;
-            char op =  ( (_ir & kDPOpCodeMask) >> 21 );
-            char source =  ( (_ir & kDPSourceMask) >> 15 );
-            char dest = ( (_ir & kDPDestMask) >> 10);
-            reg_t op2 = ( (_ir & kDPOperandTwoMask) );
-            return (alu->dataProcessing(I, S, op, source, dest, op2));
-        }
+        if (Z_CLEAR || (N_SET && V_CLEAR) || (N_CLEAR && V_SET)) return;
+        break;
+        
+        case kCondNV:           // Never
+        default:                // Never
+        break;
     }
     
-    if ((_ir & kBranchMask) == 0x0) {
-        
-        // We could be trying to execute something in reserved instruction
-        // space.  If so, deny the request.
-        if (_ir & kReservedSpaceMask == 0x0)
-        {
-            fprintf(stderr, "CPU TRAP: Execute reserved fxn: %#x\n", _ir);
-            return (cycles);
-        }
-        
-        // We're a branch
-        if (_ir & kBranchLBitMask)
-            // Store current pc in the link register (r15)
-            _r[15] = _pc;
-        
-        // Left shift the address by two because instructions are word-aligned
-        int temp = (_ir & kBranchOffsetMask) << 2;
-        
-        // Temp is now a 25-bit number, but needs to be sign extended to 32 bits
-        // we do this with a little struct trick that will PROBABLY work
-        // everywhere.
-        struct {signed int x:25;} s;
-        signed int addr = s.x = temp;
-        
-        if (_print_branch_offset)
-            printf("BRANCH: %i\n", addr);
-        
-        // Add the computed address to the pc and make sure it's not negative
-        addr += (signed int)_pc;
-        if (addr < 0)
-            _pc = 0;
-        else
-            _pc = addr;
-        
-        return (cycles);
-    }
-    
-    if ((_ir & kFloatingPointMask) == 0x0) {
-        // We're a floating point operation
-        char op = ((_ir & kFPOpcodeMask) >> 20);
-        char fps = ((_ir & kFPsMask) >> 17);
-        char fpd = ((_ir & kFPdMask) >> 14);
-        char fpn = ((_ir & kFPnMask) >> 11);
-        char fpm = ((_ir & kFPmMask) >> 8);
-        return (fpu->execute(op, _fpr[fps], _fpr[fpd], _fpr[fpn], _fpr[fpm]));
-    }
-    
-    // We're a SW interrupt
-    // pc is always saved in r15 before branching
-    _r[15] = _pc;
-    return (icu->swint(_ir & kSWIntCommentMask));
+    d->executes = false;
 }
 
 VirtualMachine::VirtualMachine()
@@ -260,10 +160,14 @@ VirtualMachine::~VirtualMachine()
 {
     // Do this first, just in case
     delete ms;
-    
     printf("Destroying virtual machine...\n");
     mmu->writeOut(_dump_file);
+    
     delete mmu;
+    delete alu;
+    delete fpu;
+    delete icu;
+    delete pipe;
     
     if (_breakpoints)
         free(_breakpoints);
@@ -386,6 +290,14 @@ bool VirtualMachine::configure(const char *c_path, ALUTimings &at)
     lua->getGlobalField("print_branch_offset", kLBool, &_print_branch_offset);
     lua->getGlobalField("program_length_trap", kLUInt, &_length_trap);
     lua->getGlobalField("machine_cycle_trap", kLUInt, &_cycle_trap);
+    lua->getGlobalField("stages", kLUInt, &_pipe_stages);
+    
+    // Error check pipe stages
+    if (_pipe_stages != 1 && _pipe_stages != 4 && _pipe_stages != 5)
+    {
+        printf("Warning: Unsupported pipeline length %u.\n", _pipe_stages);
+        _pipe_stages = kDefaultPipelineStages;
+    }
     
     // Deal with ALU timings
     if (lua->openGlobalTable("alu_timings") != kLuaUnexpectedType)
@@ -485,8 +397,9 @@ bool VirtualMachine::init(const char *config)
     if (mmu->init()) return (true);
     
     // Init instruction pipeline
-    pipe = new InstructionPipeline((reg_t)kDefaultPipelineStages, this);
+    pipe = new InstructionPipeline(_pipe_stages, this);
     if (pipe->init()) return (true);
+    if (configurePipeline()) return (true);
     
     // Load interrupt controller
     icu = new InterruptController(this, _swint_cycles);
@@ -542,7 +455,7 @@ void VirtualMachine::eval(char *op)
         respsize = strlen(response);
         return;
     } else if (strcmp(pch, kExecCommand) == 0) {
-        reg_t instruction;
+        /*reg_t instruction;
         pch = strtok(NULL, " ");
         
         if (pch)
@@ -554,11 +467,11 @@ void VirtualMachine::eval(char *op)
         _ir = instruction;
         execute();
         _ir = ir;
-        
+        */
+        fprintf(stderr, "EXEC operation not currently supported.\n");
         response = (char *)malloc(sizeof(char) * strlen(op));
         strcpy(response, op);
         respsize = strlen(response);
-        
         return;
     }
     
@@ -632,38 +545,9 @@ void VirtualMachine::trap(const char *error)
 {
     if (error) fprintf(stderr, "CPU TRAP: %s\n", error);
     _ir = 0xEF000000;
-    execute();
-}
-
-void VirtualMachine::fetchInstruction()
-{
-    // Fetch PC instruction into IR and increment the pc
-    incCycleCount(mmu->readWord(_pc, _ir));
-    
-    // Print instruction if requested
-    if (_print_instruction)
-        printf("PC: %#X\t\t\t%#X\n", _pc, _ir);
-    
-    // Increment the program counter.
-    // NOTE: The effect of this action being taken here is that the PC
-    // always points to the NEXT instruction to be executed, that is
-    // the location of the instruction ONE AHEAD of the ir register
-    _pc += kRegSize;
-    
-    // Set this up to break out of possibly invalid jumps
-    if (_length_trap)
-        if (_pc > (_length_trap + _cs))
-            trap("Program unlikely to be this long.");
-}
-
-void VirtualMachine::executeInstruction()
-{
-    // If the cond code precludes execution of the op, don't bother
-    if (!evaluateConditional())
-        return;
-    
-    // Do the op
-    incCycleCount(execute());
+    pipe->printState();
+    pipe->invalidate();
+    fex = false;
 }
 
 void VirtualMachine::waitForClientInput()
@@ -703,11 +587,52 @@ void VirtualMachine::step()
     // Can't step if we're not broken.
     if (fex) return;
     
-    // Fetch the instruction
-    fetchInstruction();
-    
-    // Execute the instruction
-    executeInstruction();
+    pipe->step();
+}
+
+bool VirtualMachine::configurePipeline()
+{
+    printf("Configuring ");
+    switch (_pipe_stages)
+    {
+        case 1:
+        printf("single stage pipeline... ");
+        if (pipe->registerStage(&VirtualMachine::doInstruction))
+            return (true);
+        _forwarding = true;
+        break;
+        
+        case 5:
+        printf("five stage pipeline... ");
+        if (pipe->registerStage(&VirtualMachine::fetchInstruction))
+            return (true);
+        if (pipe->registerStage(&VirtualMachine::decodeInstruction))
+            return (true);
+        if (pipe->registerStage(&VirtualMachine::executeInstruction))
+            return (true);
+        if (pipe->registerStage(&VirtualMachine::memoryAccess))
+            return (true);
+        if (pipe->registerStage(&VirtualMachine::writeBack))
+            return (true);
+        _forwarding = false;
+        break;
+        
+        case 4:
+        default:
+        printf("four stage pipeline (forwarding)... ");
+        if (pipe->registerStage(&VirtualMachine::fetchInstruction))
+            return (true);
+        if (pipe->registerStage(&VirtualMachine::decodeInstruction))
+            return (true);
+        if (pipe->registerStage(&VirtualMachine::executeInstruction))
+            return (true);
+        if (pipe->registerStage(&VirtualMachine::memoryAccess))
+            return (true);
+        _forwarding = true;
+        break;
+    }
+    printf("Done.\n");
+    return (false);
 }
 
 void VirtualMachine::run()
@@ -740,11 +665,8 @@ void VirtualMachine::run()
             }
         }
         
-        // Fetch the instruction
-        fetchInstruction();
-        
-        // Execute the instruction
-        executeInstruction();
+        if(pipe->cycle())
+            trap("Pipeline exception.\n");
     }
     
     // Idle and only close server after SIGINT
@@ -766,11 +688,6 @@ void VirtualMachine::installIntFunctions(reg_t *data, reg_t size)
     incCycleCount(mmu->writeBlock(_int_table_size, data, size));
     _int_function_size = size;
     printf("(%ub functions @ %#x) ", size, (reg_t)_int_table_size);
-}
-
-void VirtualMachine::shiftOffset(reg_t &offset, reg_t *val)
-{
-    alu->shiftOffset(offset, val);
 }
 
 void VirtualMachine::readWord(reg_t addr, reg_t &val)
@@ -833,4 +750,296 @@ reg_t VirtualMachine::deleteBreakpoint(reg_t index)
     _breakpoints[index] = 0x0;
     printf("Breakpoints %u deleted.\n", index);
     return (ret);
+}
+
+// Five stage pipe (writeback)
+void VirtualMachine::writeBack(PipelineData *d)
+{
+    if (!d)
+    {
+        trap("Invalid writeback parameter.\n");
+        return;
+    }
+    
+    if (!pipe->isSquashed())
+    {
+        pipe->unlock();
+        return;
+    }
+    
+    switch (d->instruction_class)
+    {
+        case kDataProcessing:
+        if (!alu->result()) break;
+        // if MUL
+        if (d->flags.dp.op == kMUL)
+        {
+            _pq[0] = alu->result();
+            _pq[1] = alu->top();
+        } else {
+            *(demuxRegID(d->flags.dp.rd)) = alu->result();
+        }
+        break;
+        
+        case kSingleTransfer:
+        // wait on dest register if it's a load
+        if (d->flags.st.l)
+            *(demuxRegID(d->flags.st.rd)) = mmu->readOut();
+        
+        // write address back into rs if w == 1
+        if (d->flags.st.w)
+            *(demuxRegID(d->flags.st.rs)) = d->flags.st.addr;
+        break;
+        
+        case kFloatingPoint:
+            *(demuxRegID(d->flags.fp.s + kFPR0Code)) = fpu->output();
+            // TODO: add another output register
+        default:
+        break;
+    }
+    
+    pipe->unlock();
+}
+
+// Four stage pipe (forwarding)
+void VirtualMachine::fetchInstruction(PipelineData *d)
+{
+    if (!d)
+    {
+        trap("Invalid fetch parameter.\n");
+        return;
+    }
+    
+    // Fetch PC instruction into IR and increment the pc
+    incCycleCount(mmu->readWord(_pc, _ir));
+    
+    // Set metadata
+    d->instruction = _ir;
+    d->location = _pc;
+    
+    // Print instruction if requested
+    if (_print_instruction)
+        printf("PC: %#X\t\t\t%#X\n", _pc, _ir);
+    
+    // Increment the program counter.
+    // NOTE: The effect of this action being taken here is that the PC
+    // always points to the NEXT instruction to be executed, that is
+    // the location of the instruction ONE AHEAD of the ir register
+    _pc += kRegSize;
+    
+    // Set this up to break out of possibly invalid jumps
+    if (_length_trap)
+        if (_pc > (_length_trap + _cs))
+            trap("Program unlikely to be this long.");
+}
+
+void VirtualMachine::decodeInstruction(PipelineData *d)
+{
+    if (!d)
+    {
+        trap("Invalid decode parameter.\n");
+        return;
+    }
+    
+    // Parse the condition code
+    // Get the most significant nybble of the instruction by masking
+    // then move it from the MSN into the LSN 
+    d->condition_code = (_ir & kConditionCodeMask) >> 28;
+    
+    // Parse the Operation Code
+    // Test to see if it has a 0 in the first place of the opcode
+    if ((_ir & 0x08000000) == 0x0)
+    {
+        // We're either a data processing or single transfer operation
+        // Test to see if there is a 1 in the second place of the opcode
+        if (_ir & kSingleTransferMask)
+        {
+            // We're a single transfer
+            d->instruction_class = kSingleTransfer;
+            d->flags.st.i = (_ir & kSTIFlagMask) ? 1 : 0;
+            d->flags.st.l = (_ir & kSTLFlagMask) ? 1 : 0;
+            d->flags.st.w = (_ir & kSTWFlagMask) ? 1 : 0;
+            d->flags.st.b = (_ir & kSTBFlagMask) ? 1 : 0;
+            d->flags.st.u = (_ir & kSTUFlagMask) ? 1 : 0;
+            d->flags.st.p = (_ir & kSTPFlagMask) ? 1 : 0;
+            d->flags.st.rs = (_ir & kSTSourceMask) >> 15;
+            d->flags.st.rd = (_ir & kSTDestMask) >> 10;
+            d->flags.st.offset = (_ir & kSTOffsetMask);
+            
+            // wait on dest register if it's a load
+            if (d->flags.st.l)
+                pipe->waitOnRegister(d->flags.st.rd);
+            
+            // wait on base if there is writeback
+            if (d->flags.st.w)
+                pipe->waitOnRegister(d->flags.st.rs);
+            
+        } else {
+            // Only other case is a data processing op
+            // extract all operands and flags
+            d->instruction_class = kDataProcessing;
+            d->flags.dp.i = (_ir & kDPIFlagMask) ? 1 : 0;
+            d->flags.dp.s = (_ir & kDPSFlagMask) ? 1 : 0;
+            d->flags.dp.op =  ( (_ir & kDPOpCodeMask) >> 21 );
+            d->flags.dp.rs =  ( (_ir & kDPSourceMask) >> 15 );
+            d->flags.dp.rd = ( (_ir & kDPDestMask) >> 10);
+            d->flags.dp.offset = ( (_ir & kDPOperandTwoMask) );
+            
+            if (d->flags.dp.op == kMUL)
+            {
+                // wait on PQ registers if it's a mul
+                pipe->waitOnRegister(kPQ0Code);
+                pipe->waitOnRegister(kPQ1Code);
+            } else {
+                // wait on dest register
+                pipe->waitOnRegister(d->flags.st.rd);
+            }
+        
+            
+        }
+        return;
+    }
+    
+    // Are we a branch?
+    if ((_ir & kBranchMask) == 0x0) {
+        // We could be trying to execute something in reserved space
+        if (_ir & kReservedSpaceMask == 0x0)
+        {
+            d->instruction_class = kReserved;
+        } else {
+            d->instruction_class = kBranch;
+            // We're a branch
+            
+            if ( _ir & kBranchLBitMask)
+                d->flags.b.link = true;
+            
+            // Left shift the address by two because instructions
+            // are word-aligned
+            int temp = (_ir & kBranchOffsetMask) << 2;
+            
+            // Temp is now a 25-bit number, but needs to be sign extended to
+            // 32 bits, so we do this with a little struct trick that will
+            // PROBABLY work everywhere.
+            struct {signed int x:25;} s;
+            s.x = temp;
+            d->flags.b.offset = s.x;
+        }
+        
+        return;
+    }
+    
+    if ((_ir & kFloatingPointMask) == 0x0) {
+        // We're a floating point operation
+        d->instruction_class = kFloatingPoint;
+        d->flags.fp.op = ((_ir & kFPOpcodeMask) >> 20);
+        d->flags.fp.s = ((_ir & kFPsMask) >> 17);
+        d->flags.fp.d = ((_ir & kFPdMask) >> 14);
+        d->flags.fp.n = ((_ir & kFPnMask) >> 11);
+        d->flags.fp.m = ((_ir & kFPmMask) >> 8);
+        
+        // TODO: Optimize this
+        pipe->waitOnRegister(d->flags.fp.s + kFPR0Code);
+        pipe->waitOnRegister(d->flags.fp.d + kFPR0Code);
+        
+        return;
+    }
+    
+    // We're a SW interrupt
+    // pc is always saved in r15 before branching
+    d->instruction_class = kInterrupt;
+    d->flags.i.comment = (_ir & kSWIntCommentMask);
+}
+
+void VirtualMachine::executeInstruction(PipelineData *d)
+{
+    if (!d)
+    {
+        trap("Invalid execute parameter.\n");
+        return;
+    }
+    
+    // If the cond code precludes execution of the op, don't bother
+    evaluateConditional(d);
+    
+    if (!d->executes)
+    {
+        pipe->squash();
+        return;
+    }
+    
+    pipe->lock();
+    
+    switch (d->instruction_class)
+    {
+        case kDataProcessing:
+        alu->dataProcessing(d->flags.dp);
+        // release the register if there's no writeback stage
+        if (!_forwarding) writeBack(d);
+        break;
+        
+        case kSingleTransfer:
+        alu->singleTransfer(d->flags.st);
+        break;
+        
+        case kBranch:
+        // Store current pc in the link register (r15)
+        if (d->flags.b.link) _r[15] = _pc;
+        
+        // If we need help debugging
+        if (_print_branch_offset) printf("BRANCH: %i\n", d->flags.b.offset);
+        
+        // Add the computed address to the pc and make sure it's not < 0
+        d->flags.b.offset += (signed int)_pc;
+        
+        // Don't jump to a negative offset
+        if (d->flags.b.offset < 0)
+            _pc = 0;
+        else
+            _pc = d->flags.b.offset;
+        
+        pipe->invalidate();
+        break;
+        
+        case kInterrupt:
+        _r[15] = _pc;
+        icu->swint(d->flags.i);
+        pipe->invalidate();
+        break;
+        
+        case kFloatingPoint:
+        fpu->execute(d->flags.fp);
+        if (!_forwarding) writeBack(d);
+        break;
+        
+        case kReserved:
+        default:
+        trap("Unknown or reserved opcode.\n");
+        break;
+    }
+}
+
+void VirtualMachine::memoryAccess(PipelineData *d)
+{
+    if (!d)
+    {
+        trap("Invalid memory access parameter.\n");
+        return;
+    }
+    
+    switch (d->instruction_class)
+    {
+        case kSingleTransfer:
+        mmu->singleTransfer(d->flags.st);
+        if (!_forwarding) writeBack(d);
+        break;
+        
+        default:
+        break;
+    }
+}
+
+// Single stage pipe
+void VirtualMachine::doInstruction(PipelineData *d)
+{
+    
 }

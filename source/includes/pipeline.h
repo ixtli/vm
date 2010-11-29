@@ -3,22 +3,79 @@
 
 #include "global.h"
 
-typedef struct PipelineFlags
+enum InstructionClasses {
+    kDataProcessing,
+    kSingleTransfer,
+    kBranch,
+    kReserved,
+    kInterrupt,
+    kFloatingPoint
+};
+
+typedef struct DPFlags
+{
+    unsigned int i:1, s:1, op:4, unused:2;
+    char rs, rd;
+    reg_t offset;
+};
+
+typedef struct STFlags
+{
+    unsigned int i:1, l:1, w:1, b:1, u:1, p:1, unused:2;
+    char rs, rd;
+    reg_t offset;
+    reg_t addr;
+};
+
+typedef struct FPFlags
+{
+    unsigned int op:4, s:3, d:3, n:3, m:3;
+    reg_t value;
+};
+
+typedef struct BFlags
+{
+    bool link;
+    signed int offset;
+};
+
+typedef struct IntFlags
+{
+    reg_t comment;
+};
+
+typedef struct PipelineData
 {
     inline void clear()
     {
-        squash = 0; bubble = 0; unused = 0;
+        instruction = 0x0;
+        location = 0x0;
+        instruction_class = kReserved;
+        condition_code = 0x0;
+        executes = false;
     }
     
-    unsigned int squash:1;
-    unsigned int bubble:1;
-    unsigned int unused:6;
+    // Metadata
+    reg_t location;
+    reg_t instruction;
+    bool executes;
+    
+    // Control registers
+    char condition_code;
+    char instruction_class;
+    union {
+        STFlags st;
+        DPFlags dp;
+        BFlags b;
+        FPFlags fp;
+        IntFlags i;
+    } flags;
 };
 
 class VirtualMachine;
 
 // Type definition for 
-typedef void *(VirtualMachine::*pipeFunc)(const void *data);
+typedef void (VirtualMachine::*pipeFunc)(PipelineData *data);
 
 class InstructionPipeline
 {
@@ -28,27 +85,44 @@ public:
     
     // setup
     bool init();
-    char registerStage(pipeFunc func);
+    bool registerStage(pipeFunc func);
     
     // Pipe manipulation
     bool cycle();
-    bool lockRegister(char reg);
-    void writeBackRegister(char reg, reg_t value);
-    bool waitOnRegisters(char regs);
-    bool testRegister(char reg);
+    bool lock();
+    void unlock();
+    bool waitOnRegister(char reg);
+    bool isSquashed();
+    void squash();
     void invalidate();
     
+    // Debugging helper methods
+    bool step();
+    char *stateString();
+    void printState();
+    
 private:
+    
+    typedef struct PipelineFlags
+    {
+        inline void clear()
+        {
+            squash = 0; bubble = 0; unused = 0;
+        }
+
+        char squash:1, bubble:1, unused:6;
+    };
+    
     char _stages, _stages_in_use;
     
     // Data registers
     pipeFunc *_inst;
-    void **_data;
+    PipelineData **_data;
     
     // Control registers
     char _registers_in_use;
     PipelineFlags *_flags;
-    char *_wait;
+    reg_t *_wait;
     
     char _current_stage;
     

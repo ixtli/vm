@@ -1,5 +1,6 @@
 #include "includes/virtualmachine.h"
 #include "includes/alu.h"
+#include "includes/pipeline.h"
 
 // Macros for checking the PSR
 #define N_SET     (_vm->_psr & kPSRNBit)
@@ -39,6 +40,8 @@ bool ALU::init(ALUTimings &timing)
     
     // Init the carry_out
     _carry_out = false;
+    _result = false;
+    _output = 0x0;
     return (false);
 }
 
@@ -93,172 +96,175 @@ bool ALU::shift(reg_t &offset, reg_t val, reg_t shift, reg_t op)
     }
 }
 
-void ALU::shiftOffset(reg_t &offset, reg_t *val)
+void ALU::shiftOffset(reg_t &offset, reg_t &val)
 {
     // Perform the somewhat complex operation of barrel shifting the offset
+    // But use the special format for the MOV operation
     reg_t operation = (offset & kShiftOp);
     reg_t shift;
-    reg_t *value;
     
-    if (val)
-    {
-        // This is the MOV special case
-        value = val;
-        
-        if (offset & kShiftType)
-            // Shifting a value in a register
-            shift = *(_vm->selectRegister((offset & kMOVShiftRs) >> 3));
-        else
-            // Shifting an immediate
-            shift = (offset & kMOVLiteral) >> 3;
-    } else {
-        // This is the standard case, get embedded val
-        value = _vm->selectRegister((offset & kShiftRmMask) >> 3);
-        
-        if (offset & kShiftType)
-            // We're shifting by the value in a register
-            shift = *(_vm->selectRegister((offset & kShiftRsMask) >> 7));
-        else
-            // We're only shifting by an immediate amount
-            shift = (offset & kShiftRsMask) >> 7;
-    }
+    if (offset & kShiftType)
+        // Shifting a value in a register
+        shift = _vm->selectRegister((offset & kMOVShiftRs) >> 3);
+    else
+        // Shifting an immediate
+        shift = (offset & kMOVLiteral) >> 3;
     
     // Shifting zero is a special case where you dont touch the C bit
     if (shift == 0)
     {
-        offset = *value;
+        offset = val;
         return;
     }
     
-    if (ALU::shift(offset, *value, shift, operation))
+    if (ALU::shift(offset, val, shift, operation))
         _vm->_psr = C_SET;
     else
         _vm->_psr = C_CLEAR;
-    
-    return;
 }
 
-cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
+void ALU::shiftOffset(reg_t &offset)
+{
+    // Perform the somewhat complex operation of barrel shifting the offset
+    reg_t operation = (offset & kShiftOp);
+    reg_t shift, value;
+    
+    // This is the standard case, get embedded val
+    value = _vm->selectRegister((offset & kShiftRmMask) >> 3);
+    
+    if (offset & kShiftType)
+        // We're shifting by the value in a register
+        shift = _vm->selectRegister((offset & kShiftRsMask) >> 7);
+    else
+        // We're only shifting by an immediate amount
+        shift = (offset & kShiftRsMask) >> 7;
+    
+    // Shifting zero is a special case where you dont touch the C bit
+    if (shift == 0)
+    {
+        offset = value;
+        return;
+    }
+    
+    if (ALU::shift(offset, value, shift, operation))
+        _vm->_psr = C_SET;
+    else
+        _vm->_psr = C_CLEAR;
+}
+
+cycle_t ALU::dataProcessing(DPFlags &instruction)
 {
     bool arithmetic = true;
     bool commit = true;
     bool alu_carry = false;
     reg_t dest;
-    reg_t *source = _vm->selectRegister(s);
+    reg_t source = _vm->selectRegister(instruction.s);
     
-    // Since we index an array using op later, make sure it's within range
-    if (op >= kDPOpcodeCount)
-    {
-        fprintf(stderr, "ALU TRAP: Unknown ALU operation.  Performing NOP.\n");
-        return (_timing.op[kNOP]);
-    }
-    
-    switch (op)
+    switch (instruction.op)
     {
         case kADD:
-        if (!I) shiftOffset(op2);
-        dest = *source + op2;
+        if (!instruction.i) shiftOffset(instruction.offset);
+        dest = source + instruction.offset;
         // check if there would have been a carry out (a+b<a)
-        if (dest < *source) alu_carry = true;
+        if (dest < source) alu_carry = true;
         break;
         
         case kSUB:
-        if (!I) shiftOffset(op2);
-        dest = *source - op2;
+        if (!instruction.i) shiftOffset(instruction.offset);
+        dest = source - instruction.offset;
         // check if there would have been a carry out (a-b>a)
-        if (dest > *source) alu_carry = true;
+        if (dest > source) alu_carry = true;
         break;
         
         case kMUL:
-        if (!I) shiftOffset(op2);
-        dest = ((*source) * op2); //store lowest 32 bits on Rd
-        //dest = ((*source) * op2) & 4294967295; //store lowest 32 bits on Rd
-        //pq[0] = (*source * op2) >> 32; //shift 32 bits right, to give highest bits
+        if (!instruction.i) shiftOffset(instruction.offset);
+        dest = ((source) * instruction.offset); //store lowest 32 bits on Rd
+        // TODO: Make this use the pq registers
         break;
         
         case kMOD:
-        if (!I) shiftOffset(op2);
-        dest = *source % op2;
+        if (!instruction.i) shiftOffset(instruction.offset);
+        dest = source % instruction.offset;
         break;
         
         case kDIV:
-        if (!I) shiftOffset(op2);
-        dest = *source / op2;
+        if (!instruction.i) shiftOffset(instruction.offset);
+        dest = source / instruction.offset;
         break;
         
         case kMOV:
         arithmetic = false;
         // This is a special case
-        if (!I)
+        if (!instruction.i)
         {
             // so use the special shift format
-            shiftOffset(op2, source);
-            dest = op2;
+            shiftOffset(instruction.offset, source);
+            dest = instruction.offset;
         } else {
             // Make a giant literal out of the five bits where source would be
-            // and the 10 bits of op2
-            dest = (s << 10) | op2;
+            // and the 10 bits of instruction.offset
+            dest = (instruction.rs << 10) | instruction.offset;
         }
         break;
         
         case kAND:
         arithmetic = false;
-        if (!I) shiftOffset(op2);
-        dest = *source & op2;
+        if (!instruction.i) shiftOffset(instruction.offset);
+        dest = source & instruction.offset;
         break;
         
         case kORR:
         arithmetic = false;
-        if (!I) shiftOffset(op2);
-        dest = *source | op2;
+        if (!instruction.i) shiftOffset(instruction.offset);
+        dest = source | instruction.offset;
         break;
         
         case kXOR:
         arithmetic = false;
-        if (!I) shiftOffset(op2);
-        dest = *source ^ op2;
+        if (!instruction.i) shiftOffset(instruction.offset);
+        dest = source ^ instruction.offset;
         break;
         
         case kNOT:
         arithmetic = false;
-        if (!I) shiftOffset(op2);
-        dest = ~(*source);
+        if (!instruction.i) shiftOffset(instruction.offset);
+        dest = ~(source);
         break;
         
         case kCMP:
         commit = false;
-        if (!I) shiftOffset(op2);
-        dest = *source - op2;
+        if (!instruction.i) shiftOffset(instruction.offset);
+        dest = source - instruction.offset;
         // check if there would have been a carry out (a-b>a)
-        if (dest > *source) alu_carry = true;
+        if (dest > source) alu_carry = true;
         break;
         
         case kCMN:
         commit = false;
-        if (!I) shiftOffset(op2);
-        dest = *source + op2;
+        if (!instruction.i) shiftOffset(instruction.offset);
+        dest = source + instruction.offset;
         // check if there would have been a carry out (a+b<a)
-        if (dest < *source) alu_carry = true;
+        if (dest < source) alu_carry = true;
         break;
         
         case kTST:
         arithmetic = false;
         commit = false;
-        if (!I) shiftOffset(op2);
-        dest = *source & op2;
+        if (!instruction.i) shiftOffset(instruction.offset);
+        dest = source & instruction.offset;
         break;
         
         case kTEQ:
         arithmetic = false;
         commit = false;
-        if (!I) shiftOffset(op2);
-        dest = *source ^ op2;
+        if (!instruction.i) shiftOffset(instruction.offset);
+        dest = source ^ instruction.offset;
         break;
         
         case kBIC:
         arithmetic = false;
-        if (!I) shiftOffset(op2);
-        dest = *source & ~op2;
+        if (!instruction.i) shiftOffset(instruction.offset);
+        dest = source & ~instruction.offset;
         break;
         
         case kNOP:
@@ -269,7 +275,7 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
     // We're done if we're not setting status bits
     // N.B.: Ignore the S bit if dest == PC, so that we dont get status bit
     //       confusion when you branch or something.
-    if (S && d != kPCCode)
+    if (instruction.s && instruction.rd != kPCCode)
     {
         // Set status bits
         // There are two cases, logical and arithmetic
@@ -277,7 +283,7 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
         {
             // the V flag in the CPSR will be set if an overflow occurs
             // into bit 31 of the result
-            if (dest & kMSBMask != *source & kMSBMask)
+            if (dest & kMSBMask != source & kMSBMask)
                 SET_V;
             else
                 CLEAR_V;
@@ -322,10 +328,60 @@ cycle_t ALU::dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2)
         }
     }
     
-    if (commit)
-        *(_vm->selectRegister(d)) = dest;
+    // Set the readable state of the ALU
+    _result = commit;
+    _output = dest;
     
     // Return timing
-    return (_timing.op[op]);
+    return (_timing.op[instruction.op]);
+}
+
+cycle_t ALU::singleTransfer(STFlags &f)
+{
+    // The base register is where the address comes from
+    reg_t base = _vm->selectRegister(f.rs);
+    // The offset modifies the base register
+    reg_t offset = f.offset;
+    
+    reg_t computed_source = base;
+    
+    // Immediate means that the offset is composed of
+    if (f.i)
+        // Use the ALU barrel shifter here
+        shiftOffset(offset);
+    
+    if (f.p)
+    {
+        // Pre indexing -- Modify source with offset before transfer
+        if (f.u)
+            // Add offset
+            computed_source += offset;
+        else
+            computed_source -= offset;
+    }
+    
+    f.addr = computed_source;
+    
+    if (!f.p)
+    {
+        // Post indexing -- Modify source with offset after transfer
+        if (f.u)
+            // Add offset
+            computed_source += offset;
+        else
+            // Subtract
+            computed_source -= offset;
+        
+        // Since we are post indexing, the W bit is redundant because
+        // if you wanted to save the source value you could just set
+        // the offset to #0
+        base = computed_source;
+    } else {
+        // Honor the write-back bit only if it's set
+        if (f.w)
+            base = computed_source;
+    }
+    
+    return (0);
 }
 

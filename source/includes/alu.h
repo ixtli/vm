@@ -59,6 +59,9 @@ struct ALUTimings {
     cycle_t op[kDPOpcodeCount];
 };
 
+struct DPFlags;
+struct STFlags;
+
 // Forward class definitions
 class VirtualMachine;
 
@@ -71,16 +74,35 @@ public:
     bool init(ALUTimings &timings);
     
     // Operational: must return the timing
-    cycle_t dataProcessing(bool I, bool S, char op, char s, char d, reg_t &op2);
+    cycle_t dataProcessing(DPFlags &instruction);
+    cycle_t singleTransfer(STFlags &f);
     
     // Access to the barrel shifter.
-    void shiftOffset(reg_t &offset, reg_t *value = NULL);
+    void shiftOffset(reg_t &offset);
+    void shiftOffset(reg_t &offset, reg_t &val);
+    
     static bool shift(reg_t &offset, reg_t val, reg_t shift, reg_t op);
+    
+    inline bool result()
+    {
+        return (_result);
+    }
+    
+    inline reg_t output()
+    {
+        return (_output);
+    }
+    
+    inline reg_t top()
+    {
+        return (_top);
+    }
     
 private:
     VirtualMachine *_vm;
     ALUTimings _timing;
-    bool _carry_out;
+    bool _carry_out, _result;
+    reg_t _output, _top;
 };
 
 #endif

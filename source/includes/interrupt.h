@@ -7,6 +7,9 @@ enum SWIntInstructionMask {
     kSWIntCommentMask   = 0x00FFFFFF
 };
 
+// Forward struct definitions
+struct IntFlags;
+
 // Forward class definitions
 class VirtualMachine;
 
@@ -19,7 +22,7 @@ public:
     bool init();
     
     // Operational: must return the timing
-    cycle_t swint(reg_t comment);
+    cycle_t swint(const IntFlags &flags);
 private:
     cycle_t _swint_cycles;
     VirtualMachine *_vm;

@@ -1,4 +1,5 @@
 #include "includes/virtualmachine.h"
+#include "includes/pipeline.h"
 #include "includes/fpu.h"
 
 FPU::FPU(VirtualMachine *vm) : _vm(vm)
@@ -16,52 +17,49 @@ bool FPU::init()
     return (false);
 }
 
-cycle_t FPU::execute(char op, reg_t &fps, reg_t &fpd, reg_t &fpn, reg_t &fpm)
+cycle_t FPU::execute(const FPFlags &flags)
 {
     printf("=================here\n");
     cycle_t cycles = 0;
     bool shift_carry = false;
     bool arithmetic = false;
-    reg_t *_fps = _vm->selectRegister(fps);
-    reg_t *_fpd = _vm->selectRegister(fpd);
-    reg_t *_fpn = _vm->selectRegister(fpn);
-    reg_t *_fpm = _vm->selectRegister(fpm);
+    reg_t fpd = _vm->selectRegister(flags.d);
+    reg_t fpn = _vm->selectRegister(flags.n);
+    reg_t fpm = _vm->selectRegister(flags.m);
     
-  //  printf("%u %u %u %u", *_fps, *_fpd, *_fpn, *_fpm);
-
-
-//Add FPn + FPm and store result in FPs and FPd.
-    switch (op)
+    //  printf("%u %u %u %u", *_fps, *_fpd, *_fpn, *_fpm);
+    
+    
+    //Add FPn + FPm and store result in FPs and FPd.
+    switch (flags.op)
     {
         case kFAD:
             printf("==============add\n");
             arithmetic = true;
-            *_fps = *_fpn + *_fpm;
+            _output = fpn + fpm;
             cycles += kFADCycles;
             break;
         case kFSB:
             printf("==============sub\n");
             arithmetic = true;
-            *_fps = *_fpn - *_fpm;
+            _output = fpn - fpm;
             cycles += kFSBCycles;
             break;
         case kFML:
             printf("==============mul\n");
             arithmetic = true;
-            *_fps = *_fpn * *_fpm;
+            _output = (fpn * fpm);
             cycles += kFMLCycles;
             break;
         case kFDV:
             printf("==============div\n");
             arithmetic = true;
-            *_fps = *_fpn / *_fpm;
+            _output = fpn / fpm;
             cycles += kFDVCycles;
             break;
-           
-
         default:
             break;
     }
     
-    return (0);
+    return (cycles);
 }

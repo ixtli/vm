@@ -5,6 +5,7 @@
 #include "includes/virtualmachine.h"
 #include "includes/alu.h"
 #include "includes/util.h"
+#include "includes/pipeline.h"
 
 #define BREAK_INTERRUPT     0xEF000000
 
@@ -187,95 +188,56 @@ cycle_t MMU::readRange(reg_t start, reg_t end, bool hex, char **ret)
     }
 }
 
-void MMU::abort(reg_t &location)
+void MMU::abort(const reg_t &location)
 {
     fprintf(stderr, "MMU ABORT: Read error %#x.\n", location);
 }
 
-cycle_t MMU::singleTransfer(const STFlags *f)
+cycle_t MMU::singleTransfer(const STFlags &f)
 {
-    // The base register is where the address comes from
-    reg_t *base = _vm->selectRegister(f->rs);
     // The dest register is where the value comes from
-    reg_t *dest = _vm->selectRegister(f->rd);
-    // The offset modifies the base register
-    reg_t offset = f->offset;
-    
-    reg_t computed_source = *base;
-    
-    // Immediate means that the offset is composed of
-    if (f->I == true)
-        // Use the ALU barrel shifter here
-        _vm->shiftOffset(offset);
-    
-    if (f->P)
-    {
-        // Pre indexing -- Modify source with offset before transfer
-        if (f->U)
-            // Add offset
-            computed_source += offset;
-        else
-            computed_source -= offset;
-    }
+    reg_t dest = _vm->selectRegister(f.rd);
     
     // Do the read/write
-    if (f->B)
+    if (f.b)
     {
         // Reading a byte only
-        if (computed_source >= _memory_size)
+        if (f.addr >= _memory_size)
         {
             // Generate a MMU abort
-            abort(computed_source);
+            abort(f.addr);
             // Fail kindly to the application
-            *dest = 0x0;
+            _read_out = 0x0;
             return (kMMUAbortCycles);
         }
         // Before modifying the following, please make sure you understand
         // what is going on, as this sort of syntax is a bit tricky.
-        if (f->L)
+        if (f.l)
         {
             // Load the byte
-            char b = ((char *)_memory)[computed_source];
-            *dest = (reg_t)b;
+            char b = ((char *)_memory)[f.addr];
+            _read_out = (reg_t)b;
         } else {
             // Store the LSByte of *dest
-            char b = (char) *dest;
-            ((char *)_memory)[computed_source] = b;
+            char b = (char) dest;
+            ((char *)_memory)[f.addr] = b;
         }
     } else {
         // Reading a whole word!
-        if (computed_source + 4 >= _memory_size)
+        if (f.addr + 4 >= _memory_size)
         {
-            abort(computed_source);
+            abort(f.addr);
             return (kMMUAbortCycles);
         }
-        if (f->L)
+        if (f.l)
+        {
             // Load the word
-            *dest = (unsigned int) *(((char *)_memory) + computed_source);
-        else
+            _read_out = (unsigned int) *(((char *)_memory) + f.addr);
+        } else {
             // Store the word
             // Remember that this is a word 
-            *(((char *)_memory) + computed_source) = *dest;
-    }
-    
-    if (!f->P)
-    {
-        // Post indexing -- Modify source with offset after transfer
-        if (f->U)
-            // Add offset
-            computed_source += offset;
-        else
-            // Subtract
-            computed_source -= offset;
-        
-        // Since we are post indexing, the W bit is redundant because
-        // if you wanted to save the source value you could just set
-        // the offset to #0
-        *base = computed_source;
-    } else {
-        // Honor the write-back bit only if it's set
-        if (f->W)
-            *base = computed_source;
+            *(((char *)_memory) + f.addr) = dest;
+        }
     }
     
     return (kMMUReadClocks);

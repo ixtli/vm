@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "includes/pipeline.h"
 #include "includes/virtualmachine.h"
 
@@ -12,8 +14,15 @@ InstructionPipeline::InstructionPipeline(char stages, VirtualMachine *vm) :
 
 InstructionPipeline::~InstructionPipeline()
 {
+    printf("Destroying pipeline... ");
     if (_inst) free(_inst);
+    // Free all PipelineData objects
+    int i = 0;
+    for (; i < _stages_in_use; i++)
+        if (_data[i]) delete _data[i];
+    printf("(%i datum) ", i);
     if (_data) free(_data);
+    printf("Done.\n");
 }
 
 // setup
@@ -30,9 +39,9 @@ bool InstructionPipeline::init()
     
     // Dynamic memory allocation
     _inst = (pipeFunc *)calloc(_stages, sizeof(pipeFunc));
-    _data = (void **)calloc(_stages, sizeof(void *));
+    _data = (PipelineData **)calloc(_stages, sizeof(PipelineData *));
     _flags = (PipelineFlags *)calloc(_stages, sizeof(PipelineFlags));
-    _wait = (char *)calloc(_stages, sizeof(char));
+    _wait = (reg_t *)calloc(_stages, sizeof(reg_t));
     
     // Error check
     if (!_inst || !_data || !_flags || !_wait)
@@ -41,25 +50,67 @@ bool InstructionPipeline::init()
         return (true);
     }
     
+    _registers_in_use = 0x0;
     _stages_in_use = 0;
     
     printf("Done.\n");
     return (false);
 }
 
-char InstructionPipeline::registerStage(pipeFunc func)
+char *InstructionPipeline::stateString()
+{
+    size_t line = 30;
+    size_t index = 0;
+    char *out = (char *)malloc(sizeof(char) * line * _stages_in_use+1);
+    sprintf(out, "Registers in use: %#x\n", _registers_in_use);
+    index = strlen(out);
+    for (int i = 0; i < _stages_in_use; i++)
+    {
+        sprintf(out + index, "%i - ", i);
+        index = strlen(out);
+        
+        if (_flags[i].bubble)
+        {
+            sprintf(out + index, "BUBBLE\t");
+        } else if (_data[i]) {
+            sprintf(out + index, "%#x\t", _data[i]->instruction);
+        } else {
+            sprintf(out + index, "CLEAR\t");
+        }
+        index = strlen(out);
+        
+        sprintf(out + index, "(%c)", _data[i]?'+':'-');
+        index = strlen(out);
+        
+        sprintf(out + index, "(%c)", _flags[i].squash? 's':' ');
+        index = strlen(out);
+        
+        sprintf(out + index, " (%#x)\n", _wait[i]);
+        index = strlen(out);
+    }
+    return (out);
+}
+
+void InstructionPipeline::printState()
+{
+    char *out = stateString();
+    fprintf(stdout, "%s", out);
+    free(out);
+}
+
+bool InstructionPipeline::registerStage(pipeFunc func)
 {
     // Error check
     if (!func)
     {
-        printf("Invalid pipeline function.\n");
+        fprintf(stderr, "Invalid pipeline function.\n");
         return (true);
     }
     
     if (_stages_in_use == _stages)
     {
         return (true);
-        printf("Pipeline full.\n");
+        fprintf(stderr, "Pipeline full.\n");
     }
     
     // Register the function to be called at stage index
@@ -68,19 +119,46 @@ char InstructionPipeline::registerStage(pipeFunc func)
     // Initialize the stage to "bubble" state
     _flags[_stages_in_use].bubble = 1;
     
+    // If the pipe is now greater than one stage, there needs to be a space
+    // for the last stage to push the datum pointer into on each pipe cycle
+    if (_stages_in_use == 1)
+    {
+        _data[1] = _data[0];
+        _data[0] = NULL;
+    } else {
+        // Allocate one more PipelineData for this new stage
+        _data[_stages_in_use] = new PipelineData();
+        if (!_data[_stages_in_use])
+        {
+            fprintf(stderr, "Allocation error.\n");
+            return (true);
+        }
+        _data[_stages_in_use]->clear();
+    }
+    
     // Increase the count
     _stages_in_use++;
     
     // No error
-    return (_stages_in_use);
+    return (false);
 }
 
 // Pipe manipulation
 bool InstructionPipeline::cycle()
 {
+    // Reset state of pipe stage zero
+    _flags[0].clear();
+    _wait[0] = 0x0;
+    
     // Loop through the stages from end to front
     for (int i = _stages_in_use - 1; i > -1; i--)
     {
+        // Set current stage index
+        _current_stage = i;
+        // Call the function with data only if it's not a bubble
+        if (!_flags[i].bubble)
+            (_vm->*_inst[i])(_data[i]);
+        
         // if this stage has dependancy on locked registers
         if (_wait[i] & _registers_in_use)
         {
@@ -101,46 +179,43 @@ bool InstructionPipeline::cycle()
             
             // halt the rest of the pipe
             break;
+        } else {
+            _wait[i] = 0x0;
         }
         
-        // Set current stage index
-        _current_stage = i;
-        // Call the function with data only if it's not a bubble
-        void *ret = NULL;
-        if (!_flags[i].bubble)
-            ret = (_vm->*_inst[i])(_data[i]);
-        
-        // If we're not the last stage
+        // If we're not the last stage or the first
         if (i < _stages_in_use - 1)
         {
             // Forward pipe state to next phase
             _flags[i+1] = _flags[i];
             _wait[i+1] = _wait[i];
             
-            // Forward returned datum
-            _data[i+1] = ret;
-            
-            // Be sure to properly dispose of the used datum because it's always
-            // going to be overwritten.  N.B.: _data[0] should always be NULL
-            if (_data[i]) free(_data[i]);
-        } else if (ret) {
-            // The only error state is if the LAST stage trys to return data
-            // This means the pipe was improperly constructed, so warn.
-            free(ret);
-            fprintf(stderr, "Instruction Pipe: Final stage passed data.\n");
-            return (true);
+            // Forward returned datum OR forward the bubble
+            if (!_data[i+1])
+            {
+                _data[i+1] = _data[i];
+                _data[i] = NULL;
+            }
+        } else {
+            if (!_data[0])
+            {
+                // Clear the data
+                _data[i]->clear();
+                // Swing it around to the beginning
+                _data[0] = _data[i];
+                // For deallocation safety
+                _data[i] = NULL;
+            }
         }
     }
-    
-    // Reset state of pipe stage zero
-    _flags[0].clear();
-    _wait[0] = 0x0;
     
     // Doing this takes one machine cycle.
     _vm->incCycleCount(1);
     
     // Reset current stage
     _current_stage = 0;
+    
+    return (false);
 }
 
 void InstructionPipeline::invalidate()
@@ -155,68 +230,51 @@ void InstructionPipeline::invalidate()
     _invalidations++;
 }
 
-bool InstructionPipeline::waitOnRegisters(char regs)
+bool InstructionPipeline::waitOnRegister(char reg)
 {
-    if (regs >= kVMRegisterMax)
+    if (reg >= kVMRegisterMax)
     {
         fprintf(stderr, "Attempt to wait on out of bounds register\n.");
         return (true);
     }
     
     // Set registers to wait on
-    _wait[_current_stage] = regs;
+    _wait[_current_stage] |= (1 << reg);
 }
 
-bool InstructionPipeline::lockRegister(char reg)
+bool InstructionPipeline::lock()
 {
-    // Error check
-    if (reg >= kVMRegisterMax)
-    {
-        fprintf(stderr, "Pipeline attempted to lock a register out of bounds.\n");
-        return (false);
-    }
-    
     // Trap on register attempting to double lock
-    if (_registers_in_use & reg)
+    if (_registers_in_use & _wait[_current_stage])
     {
-        fprintf(stderr, "Pipeline attempted to double lock register %u.\n", reg);
+        fprintf(stderr, "Register double lock!\n");
         return (false);
     }
     
-    // Lock the register
-    _registers_in_use &= reg;
+    // Lock the registers
+    _registers_in_use |= _wait[_current_stage];
     return (true);
 }
 
-void InstructionPipeline::writeBackRegister(char reg, reg_t value)
+void InstructionPipeline::unlock()
 {
-    // Error check
-    if (reg >= kVMRegisterMax)
-    {
-        fprintf(stderr, "Pipeline attempted to write a register out of bounds.\n");
-        return;
-    }
-    
-    // Write the value back if pipe isn't invalid
-    if (!_flags[_current_stage].squash)
-    {
-        reg_t *wb = _vm->selectRegister(reg);
-        *wb = value;
-    }
-    
     // Unlock the register
-    _registers_in_use ^= reg;
+    _registers_in_use ^= _wait[_current_stage];
 }
 
-bool InstructionPipeline::testRegister(char reg)
+// Debugging
+bool InstructionPipeline::step()
 {
-    // Error check
-    if (reg >= kVMRegisterMax)
-        return (false);
     
-    if (_registers_in_use & reg)
-        return (true);
-    else
-        return (false);
+}
+
+void InstructionPipeline::squash()
+{
+    _flags[_current_stage].squash = 1;
+}
+
+bool InstructionPipeline::isSquashed()
+{
+    return (_flags[_current_stage].squash ? true : false);
 }
 

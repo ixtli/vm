@@ -22,6 +22,9 @@ enum FPUProcessingTimings {
     kFDVCycles          = 1
 }; 
 
+// Forward struct definitions
+struct FPFlags;
+
 // Forward class definitions
 class VirtualMachine;
 
@@ -33,9 +36,15 @@ public:
     
     bool init();
     
+    inline reg_t output()
+    {
+        return (_output);
+    }
+    
     // Operational: must return the timing
-    cycle_t execute(char op, reg_t &fps, reg_t &fpd, reg_t &fpn, reg_t &fpm);
+    cycle_t execute(const FPFlags &flags);
 private:
+    reg_t _output;
     VirtualMachine *_vm;
 };
 

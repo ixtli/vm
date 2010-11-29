@@ -13,7 +13,6 @@
 #define kContCommand    "CONT"
 #define kStepCommand    "STEP"
 
-// Memory constants, in bytes
 #define kDefaultBreakCount 5
 #define kMinimumMemorySize 524288
 #define kDefaultPipelineStages 5
@@ -72,6 +71,7 @@ enum VMRegisterDefaults {
 };
 
 enum InstructionOpCodeMasks {
+    kConditionCodeMask  = 0xF0000000,
     kOpCodeMask         = 0x0F000000,
     kDataProcessingMask = 0x0C000000,
     kSingleTransferMask = 0x04000000,
@@ -87,6 +87,7 @@ enum BranchMasks {
 };
 
 // Forward class and struct definitions
+struct PipelineData;
 struct ALUTimings;
 struct MachineStatus;
 struct MachineDescription;
@@ -110,7 +111,6 @@ public:
     void installJumpTable(reg_t *data, reg_t size);
     void installIntFunctions(reg_t *data, reg_t size);
     bool loadProgramImage(const char *path, reg_t addr);
-    void shiftOffset(reg_t &offset, reg_t *val = NULL);
     
     // These are exposed because they are readonly, and thus
     // threadsafe
@@ -122,31 +122,9 @@ public:
     const reg_t *readOnlyMemory(reg_t &size);
     
     // Helper methods that might be nice for other things...
-    inline reg_t *selectRegister(char val)
+    inline reg_t selectRegister(const char val)
     {
-        if (val < kPQ0Code)
-            // This is a general register
-            return (&_r[val]);
-
-        if (val > kFPSRCode)
-            // This is an fpu register
-            return (&_fpr[val - kFPR0Code]);
-
-        switch (val)
-        {
-            case kPSRCode:
-            return (&_psr);
-            case kPQ0Code:
-            return (&_pq[0]);
-            case kPQ1Code:
-            return (&_pq[1]);
-            case kPCCode:
-            return (&_pc);
-            case kFPSRCode:
-            return (&_fpsr);
-            default:
-            return (NULL);
-        }
+        return (*(demuxRegID(val)));
     }
     
     inline void incCycleCount(cycle_t val)
@@ -157,6 +135,11 @@ public:
         if (_cycle_trap)
             if (_cycle_count > _cycle_trap)
                 trap("Cycle count unlikely to be this large.");
+    }
+    
+    inline void setProgramCounter(reg_t val)
+    {
+        _pc = val;
     }
     
     // Execution control
@@ -180,14 +163,29 @@ private:
     void resetGeneralRegisters();
     void setMachineDefaults();
     void relocateBreakpoints();
+    bool configurePipeline();
+    reg_t *demuxRegID(const char id);
     
-    // Fex cycle stuff
-    void fetchInstruction();
+    // Six stage pipe (conditional evalution)
+    void evaluateConditional(PipelineData *d);
+    
+    // Five stage pipe (writeback)
+    void writeBack(PipelineData *d);
+    
+    // Four stage pipe (forwarding)
+    void fetchInstruction(PipelineData *d);
+    void decodeInstruction(PipelineData *d);
+    void executeInstruction(PipelineData *d);
+    void memoryAccess(PipelineData *d);
+    
+    // Single stage pipe
+    void doInstruction(PipelineData *d);
+    
+    // Server helper functions
     void waitForClientInput();
-    void executeInstruction();
-    bool evaluateConditional();
     cycle_t execute();
     void eval(char *op);
+    
     void trap(const char *error);
     
     // Units
@@ -211,6 +209,8 @@ private:
     reg_t *_breakpoints;
     
     // Machine info
+    char _pipe_stages;
+    bool _forwarding;
     reg_t _mem_size, _read_cycles, _write_cycles, _stack_size;
     
     // registers modifiable by client

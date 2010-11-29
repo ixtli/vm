@@ -20,12 +20,7 @@ enum SingleTransferOffsetMasks {
     kSTOShiftValMask    = 0x000003E0
 };
 
-struct STFlags
-{
-    bool I, L, W, B, U, P;
-    reg_t rs, rd, offset;
-};
-
+struct STFlags;
 class VirtualMachine;
 
 class MMU
@@ -45,8 +40,13 @@ public:
         return (_memory);
     }
     
+    inline reg_t readOut()
+    {
+        return (_read_out);
+    }
+    
     // Operational: must return the timing
-    cycle_t singleTransfer(const STFlags *f);
+    cycle_t singleTransfer(const STFlags &f);
     cycle_t writeWord(reg_t addr, reg_t valueToSave);
     cycle_t writeByte(reg_t addr, char valueToSave);
     cycle_t writeBlock(reg_t addr, reg_t *data, reg_t size);
@@ -55,7 +55,9 @@ public:
     cycle_t readRange(reg_t start, reg_t end, bool hex, char **ret);
 
 private:
-    void abort(reg_t &location);
+    void abort(const reg_t &location);
+    
+    reg_t _read_out;
     
     VirtualMachine *_vm;
     reg_t _memory_size;

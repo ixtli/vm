@@ -1,5 +1,6 @@
 #include "includes/virtualmachine.h"
 #include "includes/interrupt.h"
+#include "includes/pipeline.h"
 
 #define kDefaultSWIntCycles     10
 
@@ -40,7 +41,7 @@ bool InterruptController::init()
     return (false);
 }
 
-cycle_t InterruptController::swint(reg_t comment)
+cycle_t InterruptController::swint(const IntFlags &flags)
 {
     // There are two possible interpretations of the comments field
     if (!_vm->supervisor)
@@ -49,14 +50,14 @@ cycle_t InterruptController::swint(reg_t comment)
         // as an offset into the interrupt table.
         
         // Error check
-        if (comment > sizeof(jump_table) -1)
+        if (flags.comment > sizeof(jump_table) -1)
         {
             fprintf(stderr, "Instruction Unit TRAP: Invalid interrupt loc\n");
             return (0);
         }
         
         // Move the program counter to the start of the jump function
-        *(_vm->selectRegister(kPCCode)) = sizeof(jump_table)+jump_table[comment];
+        _vm->setProgramCounter(sizeof(jump_table) + jump_table[flags.comment]);
         
         // We're entering supervisor mode
         _vm->supervisor = true;
@@ -68,7 +69,7 @@ cycle_t InterruptController::swint(reg_t comment)
     // the time it takes to do one of these hardware interrupts
     size_t ret = 1;
     
-    switch (comment)
+    switch (flags.comment)
     {
         case 0xF:
         // Treat this as BREAK, which should stop the FEX and allow the server
@@ -80,7 +81,7 @@ cycle_t InterruptController::swint(reg_t comment)
         case 0xFF:
         // This is the return function, which sets PC to r15
         // and turns off supervisor mode
-        *(_vm->selectRegister(kPCCode)) = *(_vm->selectRegister(kR15Code));
+        _vm->setProgramCounter(_vm->selectRegister(kR15Code));
         _vm->supervisor = false;
         break;
         
