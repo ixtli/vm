@@ -46,7 +46,7 @@ public:
     }
     
     // Operational: must return the timing
-    cycle_t singleTransfer(const STFlags &f);
+    cycle_t singleTransfer(const STFlags &f, reg_t addr);
     cycle_t writeWord(reg_t addr, reg_t valueToSave);
     cycle_t writeByte(reg_t addr, char valueToSave);
     cycle_t writeBlock(reg_t addr, reg_t *data, reg_t size);

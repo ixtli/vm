@@ -193,7 +193,7 @@ void MMU::abort(const reg_t &location)
     fprintf(stderr, "MMU ABORT: Read error %#x.\n", location);
 }
 
-cycle_t MMU::singleTransfer(const STFlags &f)
+cycle_t MMU::singleTransfer(const STFlags &f, reg_t addr)
 {
     // The dest register is where the value comes from
     reg_t dest = _vm->selectRegister(f.rd);
@@ -202,10 +202,10 @@ cycle_t MMU::singleTransfer(const STFlags &f)
     if (f.b)
     {
         // Reading a byte only
-        if (f.addr >= _memory_size)
+        if (addr >= _memory_size)
         {
             // Generate a MMU abort
-            abort(f.addr);
+            abort(addr);
             // Fail kindly to the application
             _read_out = 0x0;
             return (kMMUAbortCycles);
@@ -215,28 +215,28 @@ cycle_t MMU::singleTransfer(const STFlags &f)
         if (f.l)
         {
             // Load the byte
-            char b = ((char *)_memory)[f.addr];
+            char b = ((char *)_memory)[addr];
             _read_out = (reg_t)b;
         } else {
             // Store the LSByte of *dest
             char b = (char) dest;
-            ((char *)_memory)[f.addr] = b;
+            ((char *)_memory)[addr] = b;
         }
     } else {
         // Reading a whole word!
-        if (f.addr + 4 >= _memory_size)
+        if (addr + 4 >= _memory_size)
         {
-            abort(f.addr);
+            abort(addr);
             return (kMMUAbortCycles);
         }
         if (f.l)
         {
             // Load the word
-            _read_out = (unsigned int) *(((char *)_memory) + f.addr);
+            _read_out = (unsigned int) *(((char *)_memory) + addr);
         } else {
             // Store the word
             // Remember that this is a word 
-            *(((char *)_memory) + f.addr) = dest;
+            *(((char *)_memory) + addr) = dest;
         }
     }
     

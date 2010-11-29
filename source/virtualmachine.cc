@@ -644,9 +644,10 @@ void VirtualMachine::run()
     {
         // Check breakpoints on the CURRENT instruction, that is, before
         // advancing the pipeline
+        reg_t loc = pipe->locationToExecute();
         for (int i = 0; i < _breakpoint_count; i++)
         {
-            if (_breakpoints[i] == _pc && _pc != 0x0)
+            if (_breakpoints[i] == loc && loc != 0x0)
             {
                 printf("Breakpoint %i at instruction %u (%#x).\n",
                     i, _breakpoints[i] - _cs, _breakpoints[i]);
@@ -761,7 +762,7 @@ void VirtualMachine::writeBack(PipelineData *d)
         return;
     }
     
-    if (!pipe->isSquashed())
+    if (pipe->isSquashed())
     {
         pipe->unlock();
         return;
@@ -770,29 +771,30 @@ void VirtualMachine::writeBack(PipelineData *d)
     switch (d->instruction_class)
     {
         case kDataProcessing:
-        if (!alu->result()) break;
         // if MUL
+        if (!d->record) break;
         if (d->flags.dp.op == kMUL)
         {
-            _pq[0] = alu->result();
-            _pq[1] = alu->top();
+            _pq[0] = d->output0;
+            _pq[1] = d->output1;
         } else {
-            *(demuxRegID(d->flags.dp.rd)) = alu->result();
+            *(demuxRegID(d->flags.dp.rd)) = d->output0;
         }
         break;
         
         case kSingleTransfer:
         // wait on dest register if it's a load
         if (d->flags.st.l)
-            *(demuxRegID(d->flags.st.rd)) = mmu->readOut();
+            *(demuxRegID(d->flags.st.rd)) = d->output0;
         
         // write address back into rs if w == 1
         if (d->flags.st.w)
-            *(demuxRegID(d->flags.st.rs)) = d->flags.st.addr;
+            *(demuxRegID(d->flags.st.rs)) = d->output1;
         break;
         
         case kFloatingPoint:
-            *(demuxRegID(d->flags.fp.s + kFPR0Code)) = fpu->output();
+            *(demuxRegID(d->flags.fp.s + kFPR0Code)) = d->output0;
+            *(demuxRegID(d->flags.fp.d + kFPR0Code)) = d->output1;
             // TODO: add another output register
         default:
         break;
@@ -816,10 +818,6 @@ void VirtualMachine::fetchInstruction(PipelineData *d)
     // Set metadata
     d->instruction = _ir;
     d->location = _pc;
-    
-    // Print instruction if requested
-    if (_print_instruction)
-        printf("PC: %#X\t\t\t%#X\n", _pc, _ir);
     
     // Increment the program counter.
     // NOTE: The effect of this action being taken here is that the PC
@@ -969,16 +967,36 @@ void VirtualMachine::executeInstruction(PipelineData *d)
     
     pipe->lock();
     
+    // Print instruction if requested
+    if (_print_instruction)
+        printf("PC: %#X\t\t\t%#X\n", d->location, d->instruction);
+    
+    if (!d->instruction)
+    {
+        pipe->printState();
+    }
+    
     switch (d->instruction_class)
     {
         case kDataProcessing:
-        alu->dataProcessing(d->flags.dp);
+        incCycleCount(alu->dataProcessing(d->flags.dp));
+        
+        // Save emitted values
+        d->record = alu->result();
+        d->output0 = alu->output();
+        d->output1 = alu->auxOut();
+        
         // release the register if there's no writeback stage
-        if (!_forwarding) writeBack(d);
+        if (_forwarding) writeBack(d);
         break;
         
         case kSingleTransfer:
-        alu->singleTransfer(d->flags.st);
+        incCycleCount(alu->singleTransfer(d->flags.st));
+        
+        // Save emitted values
+        d->record = alu->result();
+        d->output0 = alu->output();
+        d->output1 = alu->auxOut();
         break;
         
         case kBranch:
@@ -1007,8 +1025,14 @@ void VirtualMachine::executeInstruction(PipelineData *d)
         break;
         
         case kFloatingPoint:
-        fpu->execute(d->flags.fp);
-        if (!_forwarding) writeBack(d);
+        incCycleCount(fpu->execute(d->flags.fp));
+        
+        // Save emitted values
+        d->record = alu->result();
+        d->output0 = alu->output();
+        d->output1 = alu->auxOut();
+        
+        if (_forwarding) writeBack(d);
         break;
         
         case kReserved:
@@ -1029,8 +1053,12 @@ void VirtualMachine::memoryAccess(PipelineData *d)
     switch (d->instruction_class)
     {
         case kSingleTransfer:
-        mmu->singleTransfer(d->flags.st);
-        if (!_forwarding) writeBack(d);
+        incCycleCount(mmu->singleTransfer(d->flags.st, d->output0));
+        
+        // Save values emitted by MMU;
+        d->output0 = mmu->readOut();
+        
+        if (_forwarding) writeBack(d);
         break;
         
         default:

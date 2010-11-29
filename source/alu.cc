@@ -360,7 +360,7 @@ cycle_t ALU::singleTransfer(STFlags &f)
             computed_source -= offset;
     }
     
-    f.addr = computed_source;
+    _aux_out = computed_source;
     
     if (!f.p)
     {
@@ -381,6 +381,9 @@ cycle_t ALU::singleTransfer(STFlags &f)
         if (f.w)
             base = computed_source;
     }
+    
+    _output = base;
+    _result = true;
     
     return (0);
 }

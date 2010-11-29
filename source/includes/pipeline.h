@@ -24,7 +24,6 @@ typedef struct STFlags
     unsigned int i:1, l:1, w:1, b:1, u:1, p:1, unused:2;
     char rs, rd;
     reg_t offset;
-    reg_t addr;
 };
 
 typedef struct FPFlags
@@ -70,6 +69,10 @@ typedef struct PipelineData
         FPFlags fp;
         IntFlags i;
     } flags;
+    
+    // Instructions save as many as two values
+    bool record;
+    reg_t output0, output1;
 };
 
 class VirtualMachine;
@@ -100,6 +103,7 @@ public:
     bool step();
     char *stateString();
     void printState();
+    reg_t locationToExecute();
     
 private:
     

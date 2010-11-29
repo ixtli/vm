@@ -41,7 +41,7 @@ static const char *DPOpMnumonics[kDPOpcodeCount] =
 };
 
 // Default timing for ANY instruction not specified in config file
-#define kDefaultALUTiming   1
+#define kDefaultALUTiming   0
 
 struct ALUTimings {
     ALUTimings()
@@ -93,16 +93,16 @@ public:
         return (_output);
     }
     
-    inline reg_t top()
+    inline reg_t auxOut()
     {
-        return (_top);
+        return (_aux_out);
     }
     
 private:
     VirtualMachine *_vm;
     ALUTimings _timing;
     bool _carry_out, _result;
-    reg_t _output, _top;
+    reg_t _output, _aux_out;
 };
 
 #endif

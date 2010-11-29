@@ -221,10 +221,13 @@ bool InstructionPipeline::cycle()
 void InstructionPipeline::invalidate()
 {
     // Squash all instruction after the current one
-    for (int i = 0; i < _current_stage; i++)
+    for (int i = 0; i < _stages_in_use; i++)
     {
-        _flags[i].squash = 1;
-        _instructions_invalidated++;
+        if (i != _current_stage)
+        {
+            _flags[i].squash = 1;
+            _instructions_invalidated++;
+        }
     }
     
     _invalidations++;
@@ -278,3 +281,16 @@ bool InstructionPipeline::isSquashed()
     return (_flags[_current_stage].squash ? true : false);
 }
 
+reg_t InstructionPipeline::locationToExecute()
+{
+    
+    if (_stages_in_use < 4 && _data[0])
+    {
+        return (_data[0]->location);
+    }
+    
+    if (!_flags[2].bubble && !_flags[2].squash && _data[2])
+    {
+        return (_data[2]->location);
+    }
+}
