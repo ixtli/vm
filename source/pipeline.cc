@@ -50,6 +50,9 @@ bool InstructionPipeline::init()
     
     _registers_in_use = 0x0;
     _stages_in_use = 0;
+    _bubbles = 0;
+    _invalidations = 0;
+    _instructions_invalidated = 0;
     
     printf("Done.\n");
     return (false);
@@ -60,8 +63,16 @@ char *InstructionPipeline::stateString()
     size_t line = 40;
     size_t index = 0;
     char *out = (char *)malloc(sizeof(char) * line * _stages_in_use+1);
-    sprintf(out, "\tRegisters in use: %#x\n", _registers_in_use);
+    
+    sprintf(out, "Registers in use: %#x\n", _registers_in_use);
     index = strlen(out);
+    sprintf(out+index, "Invalidations: %lu\n", _invalidations);
+    index = strlen(out);
+    sprintf(out+index, "Stages invalidated: %lu\n", _instructions_invalidated);
+    index = strlen(out);
+    sprintf(out+index, "Bubbles created: %lu\n", _bubbles);
+    index = strlen(out);
+    
     for (int i = 0; i < _stages_in_use; i++)
     {
         sprintf(out + index, "\t%i %c ", i, (i==_current_stage?'>':'-'));

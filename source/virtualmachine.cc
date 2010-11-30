@@ -535,6 +535,11 @@ char *VirtualMachine::statusString(size_t &len)
         "r8 - %u r9 - %u r10 - %u r11 - %u\n", _r[8], _r[9], _r[10], _r[11]);
     sprintf(temp+strlen(temp),  
         "r12 - %u r13 - %u r14 - %u r15 - %u\n", _r[12], _r[13], _r[14], _r[15]);
+    
+    char *pipeStatus = pipe->stateString();
+    sprintf(temp+strlen(temp),"Pipeline State:\n%s", pipeStatus);
+    free(pipeStatus);
+    
     char *ret = (char *)malloc(sizeof(char) * strlen(temp) + 1);
     strcpy(ret, temp);
     len = strlen(ret);
