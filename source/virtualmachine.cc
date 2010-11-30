@@ -974,15 +974,11 @@ void VirtualMachine::executeInstruction(PipelineData *d)
     // If the cond code precludes execution of the op, don't bother
     evaluateConditional(d);
     
+    if (!d->executes) return;
+    
     // Print instruction if requested
     if (_print_instruction)
         printf("PC: %#X\t\t\t%#X\n", d->location, d->instruction);
-    
-    if (!d->executes)
-    {
-        printf("deciding not to execute.\n");
-        return;
-    }
     
     switch (d->instruction_class)
     {
