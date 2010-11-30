@@ -50,7 +50,7 @@ typedef struct PipelineData
         instruction = 0x0;
         location = 0x0;
         instruction_class = kReserved;
-        condition_code = 0x0;
+        condition_code = 0xF; // Never
         executes = false;
     }
     
@@ -112,11 +112,11 @@ private:
         inline void clear()
         {
             squash = 0; bubble = 0; unused = 0;
-            lock = 0x0;
+            lock = 0x0; wait = 0x0;
         }
 
         char squash:1, bubble:1, unused:6;
-        reg_t lock;
+        reg_t lock, wait;
     };
     
     char _stages, _stages_in_use;
@@ -128,7 +128,6 @@ private:
     // Control registers
     char _registers_in_use;
     PipelineFlags *_flags;
-    reg_t *_wait;
     
     char _current_stage;
     

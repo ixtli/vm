@@ -1,8 +1,8 @@
 -- YAAA Virtual Machine Configuration
 program = "out"
 memory_dump = "memory.dump"
-print_instruction = true
-print_branch_offset = true
+print_instruction = false
+print_branch_offset = false
 program_length_trap = 0x50
 machine_cycle_trap = 30000
 
@@ -14,7 +14,7 @@ stack_size = 8
 break_count = 10
 
 -- Pipeline configuration
-stages = 4
+stages = 5
 
 -- Breakpoints (total should be LE to break_count)
 -- (NOTE: this is the line number of the LAST instruction you want to execute)
