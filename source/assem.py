@@ -477,7 +477,7 @@ class Assembler:
             offset = self.decToBin(0, 10)
             ret += "0" + op + pre + add
             return ret + base + sd_reg + offset
-        
+        #DEBUG PRINT print "ssss: "+str(ret)+" "+str(base)+" "+str(sd_reg)+" "+str(add)
         # Otherwise, we need to handle having an offset
         # (-)immediate
         # SHIFT
@@ -559,7 +559,7 @@ class Assembler:
                     continue
                 
                 bin += val
-                print bin
+                #print bin
             elif instruction in self.interrupt:
                 if len(line) < 1:
                     print("Must specify interrupt table offset.")
