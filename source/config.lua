@@ -1,8 +1,8 @@
 -- YAAA Virtual Machine Configuration
 program = "out"
 memory_dump = "memory.dump"
-print_instruction = true
-print_branch_offset = true
+print_instruction = false
+print_branch_offset = false
 program_length_trap = 0x50
 machine_cycle_trap = 30000
 

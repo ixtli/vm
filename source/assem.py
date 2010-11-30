@@ -180,7 +180,7 @@ class Assembler:
             if len(label):
                 # If so, record the index of the instruction that will follow
                 # this line (value of instruction_index)
-                self.label[label[0]] = instruction_index;
+                self.label[label[0]] = instruction_index + 1;
                 # Remove this line from the file so we don't worry about it
                 # in the next pass
                 self.infile.remove(line);
@@ -580,20 +580,18 @@ class Assembler:
                 bin = cond_code + self.branch[instruction];
                 
                 offset = self.label[branch_loc] - instruction_index;
-                print str(offset)
                 
-                mask = 0xFFFFFF
-                if (abs(offset) > mask):
-                    print("Warning: Branch offset greated than 24-bit max.")
+                # We have to adjust offset if we're going backwards
+                # as a result of how we kepp track of label locations
+                if self.label[branch_loc] < instruction_index:
+                    offset += 1
+                
+                if (abs(offset) > 0xFFFFFF):
+                    print("Warning: Branch offset greater than 24-bit max.")
                 
                 print "Branch Offset: " + str(offset)
                 
-                if offset < 0 :
-                    # Deal with a negative offset
-                    bin += "1" + self.decToBin(offset, 23);
-                else:
-                    # Just pack in the number
-                    bin += "0" + self.decToBin(offset, 23);
+                bin += self.decToBin(offset, 24);
             else:
                 print "Invalid operation '" + instruction + "'.";
                 bin = self.condition_codes["nv"] + self.decToBin(0, 28)
