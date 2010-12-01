@@ -69,9 +69,10 @@ class Assembler:
                     "teq" : "1100", "mov" : "1101", "nop" : "1111"}
     
     # mnumonics for loads and stores
-    # By default, NO writeback (second bit) and PRE offset (fourth bit)
-    single_transfer = {    "ldw" : "1001", "ldb" : "1011", "stw" : "0001",
-                            "stb" : "0011" }
+    # By default, NO writeback (second bit).
+    # 1st bit = 1 for load, third bit = 1 for byte transfer
+    single_transfer = {    "ldw" : "100", "ldb" : "101", "stw" : "000",
+                            "stb" : "001" }
     
     # Branch mnumonics
     branch = {  "b" : "1010", "bl" : "1011"};
@@ -98,7 +99,7 @@ class Assembler:
                 # Deal with these-style comments
                 if l[0] != "#":
                     self.infile.append(l)
-        print " "
+        
     
     def explodeOp(self, op):
         splitter = re.compile(r'\w+')
@@ -437,8 +438,6 @@ class Assembler:
         # s/d base offset
         # s/d base
         
-        ret = "01"
-        
         if len(line) < 2:
             print("Too few single transfer arguments.")
             return None
@@ -451,7 +450,13 @@ class Assembler:
         # add by default
         add = "1"
         
+        # define initial values for the other offsets
+        immediate = "0"
+        offset = "0"
+        
         # A bang after the instruction means to enable writeback
+        # N.b.: what this is doing is a little hacky, so make sure you get
+        # it before you make changes
         if line[0] == "!":
             op[1] = "1"
             del line[0]
@@ -475,13 +480,11 @@ class Assembler:
         if len(line) == 0:
             # Nothing left to do
             offset = self.decToBin(0, 10)
-            ret += "0" + op + pre + add
-            return ret + base + sd_reg + offset
-        #DEBUG PRINT print "ssss: "+str(ret)+" "+str(base)+" "+str(sd_reg)+" "+str(add)
-        # Otherwise, we need to handle having an offset
-        # (-)immediate
-        # SHIFT
-        if len(line) == 1:
+        elif len(line) == 1:
+            # Otherwise, we need to handle having an offset
+            # (-)immediate
+            # SHIFT
+            
             # Immediate offset
             imm = int(line[0])
             if imm < 0:
@@ -490,24 +493,23 @@ class Assembler:
                 add = "0"
             
             offset = self.decToBin(imm, 10)
-            ret += "0" + op + pre + add
-            return ret + base + sd_reg + offset
-        
-        # If we got here, the user wants to send the rest to the barrel
-        # shifter
-        
-        # TODO: Specify subtracting the offset from the base in a prettier
-        # way than a "-" sign ...
-        if line[0] == "-":
-            add = "0"
-        
-        # Handle the offset in the same way as the DP instructions
-        offset = self.barrelShfit(line)
-        if offset == None:
-            return None
-        
-        ret += "1" + op + pre + add
-        return ret + base + sd_reg + offset
+        else:
+            # If we got here, the user wants to send the rest to the barrel
+            # shifter
+            
+            # TODO: Specify subtracting the offset from the base in a prettier
+            # way than a "-" sign ...
+            if line[0] == "-":
+                add = "0"
+            
+            # Handle the offset in the same way as the DP instructions
+            offset = self.barrelShfit(line)
+            if offset == None:
+                return None
+            
+        # construct the op and return
+        operation = "01" + immediate + op + add + pre + base + sd_reg + offset
+        return operation
         
     
     def assemble(self):
