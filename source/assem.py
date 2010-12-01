@@ -468,13 +468,13 @@ class Assembler:
         if line[0] not in self.registers:
             print("Invalid register specifier '"+line[0]+"'.")
             return None
-        sd_reg = self.registers[line[0]]
+        base = self.registers[line[0]]
         del line[0]
         
         if line[0] not in self.registers:
             print("Invalid register specifier '"+line[0]+"'.")
             return None
-        base = self.registers[line[0]]
+        sd_reg = self.registers[line[0]]
         del line[0]
         
         if len(line) == 0:
