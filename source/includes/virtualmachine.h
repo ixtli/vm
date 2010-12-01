@@ -14,7 +14,7 @@
 #define kStepCommand    "STEP"
 
 #define kDefaultBreakCount 5
-#define kMinimumMemorySize 524288
+#define kMinimumMemorySize 1024
 #define kDefaultPipelineStages 5
 
 enum VMRegisterCounts {
@@ -119,7 +119,7 @@ public:
     char *statusString(size_t &len);
     void readWord(reg_t addr, reg_t &val);
     void readRange(reg_t start, reg_t end, bool hex, char **ret);
-    const reg_t *readOnlyMemory(reg_t &size);
+    const char *readOnlyMemory(reg_t &size);
     
     // Helper methods that might be nice for other things...
     inline reg_t selectRegister(const char val)

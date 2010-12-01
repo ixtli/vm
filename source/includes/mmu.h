@@ -34,7 +34,7 @@ public:
     reg_t loadProgramImageFile(const char *path, reg_t to, bool writeBreak);
     bool writeOut(const char *path);
     
-    inline const reg_t *readOnlyMemory(reg_t &size)
+    inline const char *readOnlyMemory(reg_t &size)
     {
         size = _memory_size;
         return (_memory);
@@ -50,7 +50,7 @@ public:
     cycle_t writeWord(reg_t addr, reg_t valueToSave);
     cycle_t writeByte(reg_t addr, char valueToSave);
     cycle_t writeBlock(reg_t addr, reg_t *data, reg_t size);
-    cycle_t readWord(reg_t addr, unsigned int &valueToRet);
+    cycle_t readWord(reg_t addr, reg_t &valueToRet);
     cycle_t readByte(reg_t addr, char &valueToRet);
     cycle_t readRange(reg_t start, reg_t end, bool hex, char **ret);
 
@@ -62,7 +62,7 @@ private:
     VirtualMachine *_vm;
     reg_t _memory_size;
     cycle_t _read_time, _write_time;
-    reg_t *_memory;
+    char *_memory;
 };
 
 #endif

@@ -41,8 +41,8 @@ reg_t *VirtualMachine::demuxRegID(const char id)
 {
     if (id >= kVMRegisterMax)
     {
-        char temp[] = "Invalid register selection '00'.\n";
-        sprintf(temp, "Invalid register selection '%2u'.\n", id);
+        char temp[35] = "Invalid register selection '%2u'.\n";
+        sprintf(temp, temp, id);
         trap(temp);
         return (NULL);
     }
@@ -78,7 +78,7 @@ reg_t *VirtualMachine::demuxRegID(const char id)
     }
 }
 
-const reg_t *VirtualMachine::readOnlyMemory(reg_t &size)
+const char *VirtualMachine::readOnlyMemory(reg_t &size)
 {
     return (mmu->readOnlyMemory(size));
 }
@@ -201,7 +201,7 @@ bool VirtualMachine::loadProgramImage(const char *path, reg_t addr)
     printf("Program stack: %u words allocated at %#x\n", _stack_size, _ss);
     
     // Code segment starts right after it
-    _cs = _ss + 1;
+    _cs = _ss + kRegSize;
     printf("Code segment: %#x\n", _cs);
     
     // Load file into memory at _cs

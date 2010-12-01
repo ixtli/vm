@@ -23,14 +23,15 @@ MMU::~MMU()
 
 bool MMU::init()
 {
-    printf("Initializing MMU: %ub RAM\n", _memory_size);
-    
     // Make sure we have a vm
     if (!_vm) return (true);
     
-    // Allocate real memory from system and zero its
+    printf("Initializing MMU: %ub RAM\n", _memory_size);
+    
+    // Allocate real memory from system and zero its contents
     printf("Allocating and zeroing memory... ");
-    _memory = (reg_t *)calloc(_memory_size, sizeof(char));
+    _memory = (char *)calloc(_memory_size, sizeof(char));
+    
     // Test to make sure memory was allocated
     if (!_memory)
     {
@@ -45,9 +46,16 @@ bool MMU::init()
 
 reg_t MMU::loadProgramImageFile(const char *path, reg_t to, bool writeBreak)
 {
-    char buffer[256];
-    std::ifstream myfile(path);
+    if (to >= _memory_size )
+    {
+        fprintf(stderr, "Tried to load memory image file outside of memory.\n");
+        return (0);
+    }
     
+    // Get the starting address of where to write to.
+    reg_t *temp = (reg_t *) &(_memory[to]);
+    
+    // Index used so that we know where the file load ended
     int i = 0;
     
     if (!path)
@@ -55,35 +63,38 @@ reg_t MMU::loadProgramImageFile(const char *path, reg_t to, bool writeBreak)
         printf("No memory image to load.\n");
         if (writeBreak)
         {
-            _memory[(to >> 2)] = BREAK_INTERRUPT;
+            *temp = BREAK_INTERRUPT;
             i = 1;
         }
         return (i);
     }
     
-    if (to >= _memory_size )
-    {
-        fprintf(stderr, "Tried to load memory image file outside of memory.\n");
-        return (i);
-    }
+    // Lines should be 32 readable characters long + \n
+    char buffer[40];
+    std::ifstream myfile(path);
+    fprintf(stdout, "Loading memory image '%s'... ", path);
     
-    printf("Loading memory image '%s'... ", path);
-    
-    while (myfile.good() && i+1 < _memory_size )
+    while (myfile.good() && (i * kRegSize) < _memory_size - 1 )
     {
-        myfile.getline(buffer, 255);
-        if (strlen(buffer) < 32)
+        myfile.getline(buffer, 40);
+        
+        if (strlen(buffer) != 32)
+        {
+            fprintf(stderr, "Warning: Line %i badly formatted. Skipping.\n", i);
             continue;
-        // 'to' is a byte address into memory, make sure to divide by 4
-        // because we're reading from an array of word-sized values
-        _memory[(to >> 2) + (i++)] = _binary_to_int(buffer);
+        }
+        
+        temp[i++] = _binary_to_int(buffer);
     }
+    
+    if ((i * kRegSize) == _memory_size && writeBreak)
+        fprintf(stderr, "Warning: INT 0 written past memory boundry.");
     
     myfile.close();
     printf("Done.\n");
     
     if (writeBreak)
-        _memory[(to >> 2) + i] = BREAK_INTERRUPT;
+        temp[i] = BREAK_INTERRUPT;
     else
         i--;
     
@@ -124,10 +135,9 @@ cycle_t MMU::writeWord(reg_t addr, reg_t valueToSave)
     if (addr >= _memory_size)
         return (0);
     
-    // Addr is a byte address, but we need to read word aligned
-    // so make sure to divide by 4
-    _memory[addr >> 2] = valueToSave;
-
+    reg_t *temp = (reg_t *) &(_memory[addr]);
+    *temp = valueToSave;
+    
     return (_write_time);
 }
 
@@ -136,10 +146,13 @@ cycle_t MMU::writeBlock(reg_t addr, reg_t *data, reg_t size)
     if ((addr + size) >= _memory_size)
         return 0;
     
-    // addr is a byte address, so we have to divide it by 4 to make a word addr
-    // size is a byte size, so divide by four to get the amount of words
+    // Get initial location in memory to write to
+    reg_t *temp = (reg_t *) &(_memory[addr]);
+    
+    // Since we're writing words, and everything wants to use sizeof() to get
+    // the size measurement, we'll have to divide by 4
     for (int i = 0; i < (size >> 2); i++)
-        _memory[(addr >> 2) + i] = data[i];
+        temp[i] = data[i];
     
     return (_write_time);
 }
@@ -149,10 +162,9 @@ cycle_t MMU::readWord(reg_t addr, reg_t &valueToRet)
     if ((addr + kRegSize) > _memory_size)
         return 0;
     
-    // Addr is a byte address, but we need to read word aligned
-    // so make sure to divide by 4
-    valueToRet = _memory[addr >> 2];
-
+    reg_t *temp = (reg_t *) &(_memory[addr]);
+    valueToRet = *temp;
+    
     return (_read_time);
 }
 
@@ -161,7 +173,7 @@ cycle_t MMU::readByte(reg_t addr, char &valueToRet)
     if (addr >= _memory_size)
         return 0;
     
-    valueToRet = ((char *)_memory)[addr];
+    valueToRet = _memory[addr];
 
     return (_read_time);
 }
@@ -175,13 +187,15 @@ cycle_t MMU::readRange(reg_t start, reg_t end, bool hex, char **ret)
     reg_t last = 0;
     *ret = (char *) malloc (sizeof(char) * count * length);
     
+    reg_t *mem = (reg_t *) &(_memory[start]);
+    
     for (int i = 0; start + i <= end; i++)
     {
         if (!hex)
         {
-            sprintf(temp, "%#x\t- %d\n", (reg_t)start+i<<2, _memory[start+i]);
+            sprintf(temp, "%#x\t- %d\n", (reg_t)start+i<<2, mem[i]);
         } else {
-            sprintf(temp, "%#x\t- %#x\n", (reg_t)start+i<<2, _memory[start+i]);            
+            sprintf(temp, "%#x\t- %#x\n", (reg_t)start+i<<2, mem[i]);            
         }
         strcpy(&(*ret)[last], temp);
         last += strlen(temp);
@@ -195,6 +209,9 @@ void MMU::abort(const reg_t &location)
 
 cycle_t MMU::singleTransfer(const STFlags &f, reg_t addr)
 {
+    // How long the operation took
+    cycle_t timing = kMMUAbortCycles;
+    
     // The dest register is where the value comes from
     reg_t dest = _vm->selectRegister(f.rd);
     
@@ -208,37 +225,37 @@ cycle_t MMU::singleTransfer(const STFlags &f, reg_t addr)
             abort(addr);
             // Fail kindly to the application
             _read_out = 0x0;
-            return (kMMUAbortCycles);
+            return (timing);
         }
-        // Before modifying the following, please make sure you understand
-        // what is going on, as this sort of syntax is a bit tricky.
+        
+        // Do the operation
         if (f.l)
         {
             // Load the byte
-            char b = ((char *)_memory)[addr];
-            _read_out = (reg_t)b;
+            char temp;
+            timing = readByte(addr, temp);
+            // Have to cast the result back
+            _read_out = (reg_t) temp;
         } else {
-            // Store the LSByte of *dest
-            char b = (char) dest;
-            ((char *)_memory)[addr] = b;
+            // Store the LSByte of dest
+            timing = writeByte(addr, (char) dest);
         }
     } else {
-        // Reading a whole word!
+        // Reading or writing a whole word!
         if (addr + 4 >= _memory_size)
         {
             abort(addr);
-            return (kMMUAbortCycles);
+            return (timing);
         }
+        
         if (f.l)
-        {
             // Load the word
-            _read_out = (unsigned int) *(((char *)_memory) + addr);
-        } else {
+            timing = readWord(addr, _read_out);
+        else
             // Store the word
-            // Remember that this is a word 
-            *(((char *)_memory) + addr) = dest;
-        }
+            timing = writeWord(addr, dest);
+        
     }
     
-    return (kMMUReadClocks);
+    return (timing);
 }
