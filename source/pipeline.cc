@@ -85,7 +85,7 @@ char *InstructionPipeline::stateString()
             if (_data[i]->location == 0x0 && _data[i]->condition_code == 0xF)
                 sprintf(out + index, "NEW\t\t");
             else
-                sprintf(out + index, "%#x\t", _data[i]->instruction);
+                sprintf(out + index, "%#010x\t", _data[i]->instruction);
         } else {
             sprintf(out + index, "CLEAR\t");
         }

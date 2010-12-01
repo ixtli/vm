@@ -124,7 +124,9 @@ public:
     // Helper methods that might be nice for other things...
     inline reg_t selectRegister(const char val)
     {
-        return (*(demuxRegID(val)));
+        reg_t *temp = demuxRegID(val);
+        if (!temp) return ((reg_t) -1);
+        return (*temp);
     }
     
     inline void incCycleCount(cycle_t val)

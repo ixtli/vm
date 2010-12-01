@@ -12,7 +12,7 @@ public:
     MemoryCache(MMU *mmu);
     ~MemoryCache();
     
-    void init(reg_t size);
+    bool init(reg_t size);
     
 private:
     MMU *_mmu;

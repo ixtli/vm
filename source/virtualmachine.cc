@@ -39,6 +39,14 @@ pthread_mutex_t server_mutex;
 
 reg_t *VirtualMachine::demuxRegID(const char id)
 {
+    if (id >= kVMRegisterMax)
+    {
+        char temp[] = "Invalid register selection '00'.\n";
+        sprintf(temp, "Invalid register selection '%2u'.\n", id);
+        trap(temp);
+        return (NULL);
+    }
+    
     if (id < kPQ0Code)
         // This is a general register
         return (&_r[id]);
@@ -59,9 +67,14 @@ reg_t *VirtualMachine::demuxRegID(const char id)
         return (&_pc);
         case kFPSRCode:
         return (&_fpsr);
+        case kCSCode:
+        return (&_cs);
+        case kDSCode:
+        return (&_ds);
+        case kSSCode:
+        return (&_ss);
         default:
-        trap("Invalid register selection.\n");
-        return (0);
+        return (NULL);
     }
 }
 
