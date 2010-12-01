@@ -1,5 +1,11 @@
 TODO
 
+Write a cache!
+
+Restrict memory size to a power of two!
+
+Test all instructions
+
 Server does NOT convert anything to Network Byte Order
     This is /very/ bad for portability
 
@@ -11,16 +17,9 @@ Interrupt table loading from file (format)
 
 Queue data structure used to represent pipeline
 	Efficiency = Optimal / Actual
-	Dependance checking
-	Installing bubbles based on dependances
-	'squashing' logic in case branch happens
-	Show pipe status in output
+	Show pipe status in output BETTER
 
-Ability to step through program using frontend (-b)
-	-b <location> - when PC hits that location break and allow step
-
-Simple Cocoa frontend
+Update client functionality
 
 Write a nontrivial program!
 
-Optimize passing of single transfer flags in struct STFlags
