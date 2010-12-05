@@ -780,20 +780,27 @@ void VirtualMachine::writeBack(PipelineData *d)
         return;
     }
     
+    // If execute decided not to, there's no unlocking to be done
     if (!d->executes) return;
     
     switch (d->instruction_class)
     {
         case kDataProcessing:
-        // if MUL
         if (!d->record) break;
         if (d->flags.dp.op == kMUL)
         {
+            // if MUL
             _pq[0] = d->output0;
             _pq[1] = d->output1;
         } else {
+            // Else we only have one place to write back to
             *(demuxRegID(d->flags.dp.rd)) = d->output0;
         }
+        
+        // Make sure to invalidate pipe if we're jumping
+        if (d->flags.dp.rd == kPCCode)
+            pipe->invalidate();
+        
         break;
         
         case kSingleTransfer:
@@ -804,6 +811,11 @@ void VirtualMachine::writeBack(PipelineData *d)
         // write address back into rs if w == 1
         if (d->flags.st.w)
             *(demuxRegID(d->flags.st.rs)) = d->output1;
+        
+        // Make sure to invalidate pipe if we're jumping
+        if (d->flags.st.rd == kPCCode)
+            pipe->invalidate();
+        
         break;
         
         case kFloatingPoint:

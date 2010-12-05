@@ -126,7 +126,7 @@ private:
     PipelineData **_data;
     
     // Control registers
-    char _registers_in_use;
+    reg_t _registers_in_use;
     PipelineFlags *_flags;
     
     char _current_stage;
