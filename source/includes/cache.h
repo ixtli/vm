@@ -3,20 +3,41 @@
 
 #include "global.h"
 
+typedef struct CacheDescription
+{
+    reg_t size;
+    char ways;
+    cycle_t time;
+};
+
 // Forward class definitions
 class MMU;
 
 class MemoryCache
 {
 public:
-    MemoryCache(MMU *mmu);
+    MemoryCache();
     ~MemoryCache();
     
-    bool init(reg_t size);
+    bool init(MMU *mmu, CacheDescription &desc, char level);
+    
+    inline cycle_t accessTime()
+    {
+        return (_access_time);
+    }
     
 private:
     MMU *_mmu;
+    
+    // Cache metadata
     reg_t _size;
+    char _ways, _level;
+    cycle_t _access_time;
+    
+    // Cache data
+    reg_t *_tag;
+    bool *_dirty;
+    char *_lru;
 };
 
 #endif // Include Guard

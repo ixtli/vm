@@ -13,6 +13,7 @@
 #include "includes/util.h"
 #include "includes/luavm.h"
 #include "includes/pipeline.h"
+#include "includes/cache.h"
 
 // Macros for checking the PSR
 #define N_SET     (_psr & kPSRNBit)
@@ -167,6 +168,7 @@ VirtualMachine::VirtualMachine()
     _program_file = NULL;
     _dump_file = NULL;
     _breakpoints = NULL;
+    _cache_desc = NULL;
 }
 
 VirtualMachine::~VirtualMachine()
@@ -190,6 +192,9 @@ VirtualMachine::~VirtualMachine()
     
     if (_program_file)
         free(_program_file);
+    
+    if (_cache_desc)
+        free(_cache_desc);
 }
 
 bool VirtualMachine::loadProgramImage(const char *path, reg_t addr)
@@ -349,11 +354,67 @@ bool VirtualMachine::configure(const char *c_path, ALUTimings &at)
         
         // Get all the breakpoints, remember lua lists are ONE-INDEXED
         // so this for loop should look a little unnatural
-        for (int i = 1; i <= max; i++)
+        for (int i = 1; i < max+1; i++)
         {
             lua->getTableField(i, kLUInt, &c);
             addBreakpoint(c << 2);
         }
+    }
+    
+    // If caches are defined, extract the description data
+    if (lua->openGlobalTable("caches") != kLuaUnexpectedType)
+    {
+        // Each value is another table
+        size_t len = lua->lengthOfCurrentObject();
+        if (len)
+        {
+            _cache_desc = (CacheDescription *) malloc(
+                sizeof(CacheDescription) * len);
+            
+            for (int i = 1; i < len+1; i++)
+            {
+                if (lua->openTableAtTableIndex(i) != kLuaUnexpectedType)
+                {
+                    if (lua->lengthOfCurrentObject() != 3)
+                    {
+                        fprintf(stderr, "Invalid cache description %i.\n", i);
+                        free(_cache_desc);
+                        _cache_desc = NULL;
+                        len = 0;
+                        lua->closeTable();
+                        break;
+                    }
+                    
+                    int err;
+                    err = lua->getTableField(1,kLUInt, &_cache_desc[i-1].size);
+                    err += lua->getTableField(2,kLUInt, &_cache_desc[i-1].ways);
+                    err += lua->getTableField(3,kLUInt, &_cache_desc[i-1].time);
+                    
+                    if (err != kLuaNoError)
+                    {
+                        fprintf(stderr, "Cache table value error.\n");
+                         free(_cache_desc);
+                        _cache_desc = NULL;
+                        len = 0;
+                        lua->closeTable();
+                        break;
+                    }
+                    
+                    lua->closeTable();
+                } else {
+                    fprintf(stderr, "Improper cache table format.\n");
+                    free(_cache_desc);
+                    _cache_desc = NULL;
+                    len = 0;
+                    break;
+                }
+            }
+        }
+        
+        _caches = len;
+        lua->closeTable();
+    } else {
+        _caches = 0;
     }
     
     // clean up 
@@ -415,7 +476,7 @@ bool VirtualMachine::init(const char *config)
     
     // Init memory
     mmu = new MMU(this, _mem_size, _read_cycles, _write_cycles);
-    if (mmu->init()) return (true);
+    if (mmu->init(_caches, _cache_desc)) return (true);
     
     // Init instruction pipeline
     pipe = new InstructionPipeline(_pipe_stages, this);

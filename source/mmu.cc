@@ -6,22 +6,27 @@
 #include "includes/alu.h"
 #include "includes/util.h"
 #include "includes/pipeline.h"
+#include "includes/cache.h"
 
 #define BREAK_INTERRUPT     0xEF000000
 
 MMU::MMU(VirtualMachine *vm, reg_t size, cycle_t rtime, cycle_t wtime) : 
     _vm(vm), _memory_size(size), _read_time(rtime), _write_time(wtime)
-{}
+{
+    _cache = NULL;
+}
 
 MMU::~MMU()
 {
     printf("Destroying MMU... ");
     if (_memory)
         free(_memory);
+    if (_cache)
+        delete [] _cache;
     printf("Done.\n");
 }
 
-bool MMU::init()
+bool MMU::init(char caches, CacheDescription *desc)
 {
     // Make sure we have a vm
     if (!_vm) return (true);
@@ -40,6 +45,31 @@ bool MMU::init()
     } else {
         printf("Done.\n");
     }
+    
+    // End if no caches to allocate
+    _caches = caches;
+    if (!_caches) return (false);
+    
+    // If we want caches, we need to have them described
+    if (!desc) return (true);
+    
+    printf("Initializing %u caches:\n", caches);
+    _cache = new MemoryCache[_caches];
+    if (!_cache)
+    {
+        fprintf(stderr, "Could not allocate cache array.\n");
+        return (true);
+    }
+    
+    for (int i = 0; i < _caches; i++ )
+    {
+        if (_cache[i].init(this, desc[i], i))
+            return (true);
+    }
+    
+    // Initialize cache accounting
+    _evictions = 0;
+    _misses = 0;
     
     return (false);
 }

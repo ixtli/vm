@@ -20,7 +20,10 @@ enum SingleTransferOffsetMasks {
     kSTOShiftValMask    = 0x000003E0
 };
 
+struct CacheDescription;
 struct STFlags;
+
+class MemoryCache;
 class VirtualMachine;
 
 class MMU
@@ -29,7 +32,7 @@ public:
     MMU(VirtualMachine *vm, reg_t size, cycle_t rtime, cycle_t wtime);
     ~MMU();
     
-    bool init();
+    bool init(char caches, CacheDescription *desc);
     
     reg_t loadProgramImageFile(const char *path, reg_t to, bool writeBreak);
     bool writeOut(const char *path);
@@ -60,9 +63,14 @@ private:
     reg_t _read_out;
     
     VirtualMachine *_vm;
+    char _caches;
+    MemoryCache *_cache;
     reg_t _memory_size;
     cycle_t _read_time, _write_time;
     char *_memory;
+    
+    // Cache accounting
+    cycle_t _evictions, _misses;
 };
 
 #endif

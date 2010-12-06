@@ -173,6 +173,24 @@ LuaError LuaVM::getTableField(int index, LuaFields field, void *ret)
     return (err);
 }
 
+LuaError LuaVM::openTableAtTableIndex(int index)
+{
+    // If we're not looking at a table, error.
+    if (!lua_istable(L, -1))
+        return (kLuaTableNotOpen);
+    
+    // Push the index
+    lua_pushinteger(L, index);
+    // Get the value for the index.
+    lua_gettable(L, -2);
+    
+    // Expect what we got to be a table
+    if (!lua_istable(L, -1))
+        return (kLuaUnexpectedType);
+    
+    return (kLuaNoError);
+}
+
 LuaError LuaVM::openGlobalTable(const char *name)
 {
     if (!name) return (kLuaInvalidName);

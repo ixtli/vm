@@ -91,6 +91,7 @@ struct PipelineData;
 struct ALUTimings;
 struct MachineStatus;
 struct MachineDescription;
+struct CacheDescription;
 
 class MonitorServer;
 class InterruptController;
@@ -211,9 +212,10 @@ private:
     reg_t *_breakpoints;
     
     // Machine info
-    char _pipe_stages;
+    char _pipe_stages, _caches;
     bool _forwarding;
     reg_t _mem_size, _read_cycles, _write_cycles, _stack_size;
+    CacheDescription *_cache_desc;
     
     // registers modifiable by client
     reg_t _r[kGeneralRegisters], _pq[kPQRegisters], _pc, _cs, _ds, _ss;

@@ -33,7 +33,8 @@ public:
     LuaError getGlobalField(const char *name, LuaFields field, void *ret);
     LuaError getTableField(const char *name, LuaFields field, void *ret);
     LuaError getTableField(int index, LuaFields field, void *ret);
-    size_t lengthOfCurrentObject(); 
+    size_t lengthOfCurrentObject();
+    LuaError openTableAtTableIndex(int index);
     LuaError openGlobalTable(const char *name);
     LuaError closeTable();
     
