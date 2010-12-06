@@ -223,7 +223,7 @@ private:
     reg_t _ir;
     
     // information about memory
-    reg_t _int_table_size, _int_function_size;
+    reg_t _int_table_size, _int_function_size, _image_size;
     
     // state info
     cycle_t _cycle_count, _swint_cycles, _branch_cycles;

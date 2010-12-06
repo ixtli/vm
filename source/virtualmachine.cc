@@ -205,10 +205,10 @@ bool VirtualMachine::loadProgramImage(const char *path, reg_t addr)
     printf("Code segment: %#x\n", _cs);
     
     // Load file into memory at _cs
-    reg_t image_size = mmu->loadProgramImageFile(path, _cs, true);
+    _image_size = mmu->loadProgramImageFile(path, _cs, true);
     
     // Set data segment after code segment
-    _ds = _cs + image_size;
+    _ds = _cs + _image_size;
     
     // Report
     printf("Data segment: %#x\n", _ds);
@@ -838,6 +838,16 @@ void VirtualMachine::fetchInstruction(PipelineData *d)
         trap("Invalid fetch parameter.\n");
         return;
     }
+    
+    // Try to detect if we've jumped to something that doesn't look like a valid
+    // instruction
+    if ((_pc - _cs) % 4)
+        // pc isn't word aligned with _cs
+        fprintf(stderr, "Warning: PC not word aligned with code segment.\n");
+    
+    if (_pc > _cs + _image_size)
+        // Going outside of the bounds of the loaded program image
+        fprintf(stderr, "Warning: PC outside of program image (%#x).\n", _pc);
     
     // Fetch PC instruction into IR and increment the pc
     incCycleCount(mmu->readWord(_pc, _ir));
