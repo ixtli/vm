@@ -83,3 +83,15 @@ char *_int_to_binary(unsigned int val, char **start)
     ret[size] = '\0';
     return (ret);
 }
+
+unsigned int _nearest_power_of_two(unsigned int val)
+{
+    if (!val) return 1;
+    
+    unsigned int ret = val;
+    ret--;
+    for (int i = 1; i < sizeof(unsigned int); i <<= 1)
+        ret = ret | ret >> i;
+    
+    return (ret + 1);
+}

@@ -293,6 +293,14 @@ bool VirtualMachine::configure(const char *c_path, ALUTimings &at)
         return (true);
     }
     
+    // Enforce POT for _memory_size
+    reg_t npot = _nearest_power_of_two(_mem_size);
+    if (npot != _mem_size)
+    {
+        fprintf(stderr, "Warning: Memory size scaled to nearest power of two.\n");
+        _mem_size = npot;
+    }
+    
     // Optional arguments
     lua->getGlobalField("stack_size", kLUInt, &_stack_size);
     lua->getGlobalField("swint_cycles", kLUInt, &_swint_cycles);
