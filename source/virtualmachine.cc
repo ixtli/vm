@@ -804,13 +804,19 @@ void VirtualMachine::writeBack(PipelineData *d)
         break;
         
         case kSingleTransfer:
-        // wait on dest register if it's a load
+        // writeback to dest register if a load
         if (d->flags.st.l)
-            *(demuxRegID(d->flags.st.rd)) = d->output0;
+        {
+            *(demuxRegID(d->flags.st.rs)) = d->output1;
+            
+            if (d->flags.st.w)
+                *(demuxRegID(d->flags.st.rd)) = d->output0;
+        } else {
+            if (d->flags.st.w)
+                *(demuxRegID(d->flags.st.rs)) = d->output0;
+        }
         
         // write address back into rs if w == 1
-        if (d->flags.st.w)
-            *(demuxRegID(d->flags.st.rs)) = d->output1;
         
         // Make sure to invalidate pipe if we're jumping
         if (d->flags.st.rd == kPCCode)
@@ -1084,8 +1090,8 @@ void VirtualMachine::executeInstruction(PipelineData *d)
         
         // Save emitted values
         d->record = alu->result();
-        d->output0 = alu->output();
-        d->output1 = alu->auxOut();
+        d->output0 = alu->output(); // value, if any, to be written to base
+        d->output1 = alu->auxOut(); // Computed source address for this op
         break;
         
         case kBranch:
@@ -1137,10 +1143,10 @@ void VirtualMachine::memoryAccess(PipelineData *d)
     switch (d->instruction_class)
     {
         case kSingleTransfer:
-        incCycleCount(mmu->singleTransfer(d->flags.st, d->output0));
+        incCycleCount(mmu->singleTransfer(d->flags.st, d->output1));
         
         // Save values emitted by MMU;
-        d->output0 = mmu->readOut();
+        d->output1 = mmu->readOut();  // value, if any, to be written from load
         
         if (_forwarding) writeBack(d);
         break;

@@ -339,7 +339,13 @@ cycle_t ALU::dataProcessing(DPFlags &instruction)
 cycle_t ALU::singleTransfer(STFlags &f)
 {
     // The base register is where the address comes from
-    reg_t base = _vm->selectRegister(f.rs);
+    reg_t base;
+    
+    if (f.l)
+        base = _vm->selectRegister(f.rd);
+    else
+        base = _vm->selectRegister(f.rs);
+    
     // The offset modifies the base register
     reg_t offset = f.offset;
     
