@@ -48,6 +48,11 @@ public:
         return (_read_out);
     }
     
+    inline reg_t memorySize()
+    {
+        return (_memory_size);
+    }
+    
     // Operational: must return the timing
     cycle_t singleTransfer(const STFlags &f, reg_t addr);
     cycle_t writeWord(reg_t addr, reg_t valueToSave);

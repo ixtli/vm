@@ -21,6 +21,9 @@ public:
     
     bool init(MMU *mmu, CacheDescription &desc, char level);
     
+    bool isCached(reg_t addr);
+    void cache(reg_t addr);
+    
     inline cycle_t accessTime()
     {
         return (_access_time);
@@ -38,6 +41,7 @@ private:
     reg_t *_tag;
     bool *_dirty;
     char *_lru;
+    
 };
 
 #endif // Include Guard
