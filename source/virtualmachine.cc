@@ -823,6 +823,29 @@ void VirtualMachine::writeBack(PipelineData *d)
         *(demuxRegID(d->flags.fp.d + kFPR0Code)) = d->output1;
         break;
         
+        case kBranch:
+        // Store current pc in the link register (r15)
+        if (d->flags.b.link) _r[15] = d->location;
+        // Don't jump to a negative offset
+        if (_print_branch_offset) printf("BRANCH: %i\n", d->flags.b.offset);
+        if (d->flags.b.offset < 0)
+            _pc = 0;
+        else
+            _pc = d->flags.b.offset;
+        
+        // Invalidate the pipe
+        pipe->invalidate();
+        break;
+        
+        case kInterrupt:
+        // pc is always saved in r15 before branching 
+        _r[15] = d->location;
+        incCycleCount(icu->swint(d->flags.i));
+        
+        // Invalidate the pipe, we're branching
+        pipe->invalidate();
+        break;
+        
         default:
         break;
     }
@@ -838,16 +861,6 @@ void VirtualMachine::fetchInstruction(PipelineData *d)
         trap("Invalid fetch parameter.\n");
         return;
     }
-    
-    // Try to detect if we've jumped to something that doesn't look like a valid
-    // instruction
-    if ((_pc - _cs) % 4)
-        // pc isn't word aligned with _cs
-        fprintf(stderr, "Warning: PC not word aligned with code segment.\n");
-    
-    if (_pc > _cs + _image_size)
-        // Going outside of the bounds of the loaded program image
-        fprintf(stderr, "Warning: PC outside of program image (%#x).\n", _pc);
     
     // Fetch PC instruction into IR and increment the pc
     incCycleCount(mmu->readWord(_pc, _ir));
@@ -998,7 +1011,6 @@ void VirtualMachine::decodeInstruction(PipelineData *d)
     }
     
     // We're a SW interrupt
-    // pc is always saved in r15 before branching
     d->instruction_class = kInterrupt;
     d->flags.i.comment = (_ir & kSWIntCommentMask);
 }
@@ -1019,6 +1031,19 @@ void VirtualMachine::executeInstruction(PipelineData *d)
     // Print instruction if requested
     if (_print_instruction)
         printf("PC: %#X\t\t\t%#X\n", d->location, d->instruction);
+    
+    // Try to detect if we've jumped to something that doesn't look like a valid
+    // instruction
+    if ((d->location - _cs) % 4)
+        // pc isn't word aligned with _cs
+        fprintf(stderr, "Warning: PC not word aligned with code segment.\n");
+    
+    if (d->location > _cs + _image_size)
+    {
+        // Going outside of the bounds of the loaded program image
+        fprintf(stderr, "Warning: PC outside of program image (%#x).\n",
+                d->location);
+    }
     
     switch (d->instruction_class)
     {
@@ -1064,23 +1089,17 @@ void VirtualMachine::executeInstruction(PipelineData *d)
         break;
         
         case kBranch:
-        // Store current pc in the link register (r15)
-        if (d->flags.b.link) _r[15] = d->location;
-        // Don't jump to a negative offset
-        if (_print_branch_offset) printf("BRANCH: %i\n", d->flags.b.offset);
-        d->flags.b.offset += ((signed int)d->location);
-        if (d->flags.b.offset < 0)
-            _pc = 0;
-        else
-            _pc = d->flags.b.offset;
+        // As far as I can see, there is no reason to lock a register here
+        // since once writeback occurs, everything will get invalidated
         
-        pipe->invalidate();
+        // Calculate offset based on location of the instruction
+        d->flags.b.offset += ((signed int)d->location);
+        
+        if (_forwarding) writeBack(d);
         break;
         
         case kInterrupt:
-        _r[15] = d->location;
-        icu->swint(d->flags.i);
-        pipe->invalidate();
+        if (_forwarding) writeBack(d);
         break;
         
         case kFloatingPoint:
