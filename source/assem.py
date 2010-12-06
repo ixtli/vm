@@ -19,6 +19,7 @@ class Assembler:
     
     # The asm file
     infile = []
+    processedFile = []
     
     # Member variables
     label = {};
@@ -181,14 +182,18 @@ class Assembler:
             if len(label):
                 # If so, record the index of the instruction that will follow
                 # this line (value of instruction_index)
-                self.label[label[0]] = instruction_index + 1;
+                self.label[label[0]] = instruction_index;
                 # Remove this line from the file so we don't worry about it
                 # in the next pass
-                self.infile.remove(line);
+                
+                # Uncomment the following to display labels
+                # print "Label '"+label[0]+"': " + str(instruction_index)
             else:
                 # It is not a label so increase the instruction index
+                self.processedFile.append(line);
                 instruction_index += 1;
         
+        print ""
     
     def movShift(self, line):
         """
@@ -523,7 +528,10 @@ class Assembler:
         instruction_index = 0;
         
         # Perform the second pass, changing the instructions into ops
-        for lines in self.infile:
+        for lines in self.processedFile:
+            
+            # Uncomment the following to print instructions with line numbers
+            # print str(instruction_index) + ": " + lines
             
             line = self.explodeOp(lines)
             
@@ -591,7 +599,7 @@ class Assembler:
                 if (abs(offset) > 0xFFFFFF):
                     print("Warning: Branch offset greater than 24-bit max.")
                 
-                print "Branch Offset: " + str(offset)
+                # print "Branch to '"+branch_loc+"': " + str(offset)
                 
                 bin += self.decToBin(offset, 24);
             else:
