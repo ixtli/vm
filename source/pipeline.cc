@@ -60,9 +60,10 @@ bool InstructionPipeline::init()
 
 char *InstructionPipeline::stateString()
 {
-    size_t line = 40;
+    // This is a magic number that should be bigger than any line will get
+    size_t line = 60;
     size_t index = 0;
-    char *out = (char *)malloc(sizeof(char) * line * _stages_in_use+1);
+    char *out = (char *)malloc(sizeof(char) * line * _stages_in_use + 1);
     
     sprintf(out, "Registers in use: %#x\n", _registers_in_use);
     index = strlen(out);
@@ -80,14 +81,18 @@ char *InstructionPipeline::stateString()
         
         if (_flags[i].bubble)
         {
-            sprintf(out + index, "BUBBLE\t");
+            sprintf(out + index, "BUBBLE\t\t\t");
         } else if (_data[i]) {
             if (_data[i]->location == 0x0 && _data[i]->condition_code == 0xF)
+            {
                 sprintf(out + index, "NEW\t\t");
-            else
+            } else {
+                sprintf(out + index, "%#010x: ", _data[i]->location);
+                index = strlen(out);
                 sprintf(out + index, "%#010x\t", _data[i]->instruction);
+            }
         } else {
-            sprintf(out + index, "CLEAR\t");
+            sprintf(out + index, "CLEAR\t\t\t");
         }
         index = strlen(out);
         
