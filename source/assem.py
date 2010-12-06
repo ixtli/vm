@@ -193,7 +193,6 @@ class Assembler:
                 self.processedFile.append(line);
                 instruction_index += 1;
         
-        print ""
     
     def movShift(self, line):
         """

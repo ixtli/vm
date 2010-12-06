@@ -3,7 +3,7 @@ program = "out"
 memory_dump = "memory.dump"
 print_instruction = false
 print_branch_offset = false
-program_length_trap = 0x50
+program_length_trap = 0x1000
 machine_cycle_trap = 30000
 
 -- YAAA Machine Description
