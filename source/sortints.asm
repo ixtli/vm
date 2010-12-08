@@ -19,6 +19,7 @@ data:
         mov r14, ds
 main:
         ldw r1, r0
+        mov r10, 0
         cmp r1, r10
     eq  b end
         add r0, r0, 4
@@ -26,12 +27,9 @@ main:
         cmp r1, r2
     lt  b main
         stw r0, r1 
-        mov r13, r1
-        mov r12, r3
         sub r0, r0, 4
         stw r0, r2
         mov r0, ds
     al  b main
-        mov r9, 333
 end:
 add r14, r14, 1
