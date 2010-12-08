@@ -20,6 +20,9 @@ bool MemoryCache::init(MMU *mmu, CacheDescription &desc, char level)
 {
     if (!mmu) return (true);
     
+    // Line is this many WORDS long
+    _length = kLineSize;
+    
     // Initialize members
     _mmu = mmu;
     _level = level;
@@ -71,18 +74,68 @@ bool MemoryCache::init(MMU *mmu, CacheDescription &desc, char level)
     
     // initialize tag to -1 for "empty" because it can't get that big
     for (reg_t i = 0; i < _size; i++)
-        _tag[i] = -1;
+        _tag[i] = kCacheMaxTagValue;
+    
+    // create the mask for the tag part of an address
+    reg_t temp = (_size / _ways);
+    char bits = 0;
+    while (temp)
+    {
+        bits++;
+        temp >>= 1;
+    }
+    
+    // The _tag_mask now selects the bits of an address with 
+    _tag_mask = kCacheMaxTagValue << bits;
+    _index_mask = ~_tag_mask;
+    
+    // TODO: Calculate this when implementing variable line length
+    _offset_mask = 0xF;
     
     printf("Done.\n");
     return (false);
 }
 
-bool isCached(reg_t addr)
+bool MemoryCache::isCached(reg_t addr)
 {
+    reg_t index = addr & _index_mask;
+    reg_t tag = addr & _tag_mask;
     
+    // locate
+    
+    return (false);
 }
 
-void cache(reg_t addr)
+bool MemoryCache::cache(reg_t &addr, bool write)
 {
+    // if addr present in cache
+        
+        // update LRU state
+        
+        // if write, mark as dirty
+        
+        // return false
+        
+    // else if empty lines
+        
+        // cache value
+        
+        // update LRU state
+        
+        // if write, mark dirty
+        
+    // else (no empty lines)
+        
+        // if LRU line is dirty, save victim's addr
+        
+        // replace victim with addr
+        
+        // update LRU state
+        
+        // if write, mark line as dirty
+        
+        // if evicted line was dirty, change addr to victim's addr
+    
+    // return true
     
 }

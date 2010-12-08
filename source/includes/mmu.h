@@ -63,6 +63,7 @@ public:
     cycle_t readRange(reg_t start, reg_t end, bool hex, char **ret);
 
 private:
+    cycle_t cache(reg_t addr, bool write = false, bool word = true);
     void abort(const reg_t &location);
     
     reg_t _read_out;

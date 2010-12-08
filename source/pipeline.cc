@@ -301,24 +301,31 @@ bool InstructionPipeline::waitOnRegister(char reg)
 
 bool InstructionPipeline::lock(char reg)
 {
-    // Trap on register attempting to double lock
-    if (_registers_in_use & (1 << reg))
-    {
-        fprintf(stderr, "Register double lock!\n");
-        return (false);
-    }
-    
     // Lock the registers
     _registers_in_use |= (1 << reg);
     _flags[_current_stage].lock |= (1 << reg);
+    
+    // We might want to do this for debugging many instructions at once
+    // printf("In use: %#x\n", _registers_in_use);
+    
     return (true);
 }
 
 void InstructionPipeline::unlock()
 {
-    // Unlock the register
-    _registers_in_use ^= _flags[_current_stage].lock;
+    if (!_flags[_current_stage].lock)
+        return;
+    
+    // Unlock this stages registers
     _flags[_current_stage].lock = 0x0;
+    
+    // Reconstruct _registers_in_use
+    _registers_in_use = 0x0;
+    for (int i = 0; i < _stages_in_use; i++)
+        _registers_in_use |= _flags[i].lock;
+    
+    
+    // printf("  In use: %#x\n", _registers_in_use);
 }
 
 // Debugging
