@@ -215,7 +215,7 @@ cycle_t MMU::writeBlock(reg_t addr, reg_t *data, reg_t size)
     
     // Simulate a cache
     cycle_t ret = 0;
-    for (int i = 0; i < size; i++)
+    for (int i = 0; i < size; i += 4)
         ret += cache(addr + i, true, false);
     
     // The amount of time this takes is simulated by our caches

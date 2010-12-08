@@ -19,7 +19,7 @@ stages = 5
 -- Cache configuration
 -- Each element in the list is {lines, ways, line length, access time}
 caches = {{128, 2, 4, 1}, {256, 3, 4, 10}, {512, 4, 4, 50}}
-debug_cache = true
+debug_cache = false
 
 -- Breakpoints (total should be LE to break_count)
 -- (NOTE: this is the line number of the LAST instruction you want to execute)

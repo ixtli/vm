@@ -413,7 +413,8 @@ cycle_t MemoryCache::write(reg_t addr, reg_t val)
     
     if (start)
     {
-        if (_debug) printf("CACHE: Writing over word boundry.");
+        //if (_debug)
+            printf("CACHE: Writing over word boundry.\n");
         
         reg_t top, bottom;
         reg_t mask = kWordMask;
