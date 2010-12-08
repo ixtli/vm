@@ -21,8 +21,9 @@ cycle_t FPU::execute(const FPFlags &flags)
 {
     cycle_t cycles = 0;
     bool shift_carry = false;
-    bool arithmetic = false;
-    reg_t fpd = _vm->selectRegister(flags.d);
+    bool arithmetic = true;
+    reg_t dest;
+    //reg_t fpd = _vm->selectRegister(flags.d);
     reg_t fpn = _vm->selectRegister(flags.n);
     reg_t fpm = _vm->selectRegister(flags.m);
 
@@ -33,32 +34,20 @@ cycle_t FPU::execute(const FPFlags &flags)
     switch (flags.op)
     {
         case kFAD:
-            printf("==============add\n");
-            arithmetic = true;
             _output = fpn + fpm;
-            cycles += kFADCycles;
             break;
         case kFSB:
-            printf("==============sub\n");
-            arithmetic = true;
             _output = fpn - fpm;
-            cycles += kFSBCycles;
             break;
         case kFML:
-            printf("==============mul\n");
-            arithmetic = true;
             _output = (fpn * fpm);
-            cycles += kFMLCycles;
             break;
         case kFDV:
-            printf("==============div\n");
-            arithmetic = true;
             _output = fpn / fpm;
-            cycles += kFDVCycles;
             break;
         default:
             break;
     }
-    fpd = _output;   
+    //fpd = _output;   
     return (cycles);
 }
