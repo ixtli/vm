@@ -161,17 +161,20 @@ bool MMU::writeOut(const char *path)
 cycle_t MMU::cache(reg_t addr, bool write, bool word)
 {
     cycle_t ret = 0;
+    reg_t resolved_address = addr;
     
-    // is it in any of the caches?
+    // are we writing a word?  if not pack
+    reg_t value = 0;
+    if (!word && write)
+    {
+        char start = addr & kIgnoredBitsMask;
+        value <<= start * 8;
+    }
     
-    // if it is, get the total cost of reading from the caches we've read to
-    // so far.  also dirty the line if we're writing
+    // Just look at level zero cache
+    if (write) return (_cache[0].write(resolved_address, value));
     
-    // if not, load it in to all of the caches
-    
-    // if any evictions occurred keep track of the time taken to write back
-    
-    return (ret);
+    return (_cache[0].read(resolved_address));
 }
 
 cycle_t MMU::writeByte(reg_t addr, char valueToSave)

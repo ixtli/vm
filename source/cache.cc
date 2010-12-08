@@ -220,7 +220,7 @@ cycle_t MemoryCache::cache(reg_t addr, reg_t &index, bool write)
         // This is a cache hit!
         // index now points to the index in our cache where the val is
         if (_debug)
-            printf("found in set %u way %u ", _size / index, _size % index);
+            printf("cache hit %u ", index);
         
         // update LRU state
         use(index);
@@ -231,6 +231,9 @@ cycle_t MemoryCache::cache(reg_t addr, reg_t &index, bool write)
             _dirty[index] = true;
             
             // actually write the value
+        } else {
+            // return the value
+            index = 0;
         }
         
         // inform caller that there were no evictions
@@ -243,7 +246,7 @@ cycle_t MemoryCache::cache(reg_t addr, reg_t &index, bool write)
     // ignore the offset entirely, we're just looking for a line in a set
     set >>= (_offset_bits + kIgnoredBits);
     // make set point to the beginning of this index's set
-    set = index * _ways;
+    set *= _ways;
     
     // see if set has empty lines
     for (int i = 0; i < _ways; i++)
@@ -256,7 +259,7 @@ cycle_t MemoryCache::cache(reg_t addr, reg_t &index, bool write)
             if (_debug)
             {
                 printf("empty line found in set %u way %u ",
-                        _size / index, _size % index);
+                        set ? set / _ways : 0, i);
             }
             
             // set tag
@@ -277,19 +280,14 @@ cycle_t MemoryCache::cache(reg_t addr, reg_t &index, bool write)
                         ret += _parent->read(temp);
                     }
                     
-                    // set new value
-                    
                 } else {
                     // Go to main memory
                     for (int j = 0; j < _line_length; j++)
                         // For now, just time everything
                         ret += _mmu->readTime();
-                    
-                    // set new value, you know, if you're into that
                 }
             } else {
-                // write the value to index
-                
+                // set the value, if you're, you know, into that
             }
             
             // update LRU state
@@ -297,6 +295,9 @@ cycle_t MemoryCache::cache(reg_t addr, reg_t &index, bool write)
             
             // set the dirty bit
             _dirty[index] = write;
+            
+            // Set the value otherwise
+            if (!write) index = 0;
             
             // return
             if (_debug) printf("\n");
@@ -309,7 +310,11 @@ cycle_t MemoryCache::cache(reg_t addr, reg_t &index, bool write)
     index = lru(set);
     
     if (_debug)
-        printf("evicting set %u way %u ", _size / index, _size % index);
+    {
+        reg_t comp_set = set ? set / _ways : 0;
+        printf("evicting set %u way %u ",
+                comp_set, index - set);
+    }
     
     // if index is dirty, write the value to parent
     if (_dirty[index])
@@ -335,6 +340,8 @@ cycle_t MemoryCache::cache(reg_t addr, reg_t &index, bool write)
     }
     
     // replace victim with addr
+    _tag[index] = addr & _tag_mask;
+    
     // This is where we would actually get the value requested
     
     // TODO: Optimize this so that we don't read from the word
@@ -364,7 +371,10 @@ cycle_t MemoryCache::cache(reg_t addr, reg_t &index, bool write)
     
     if (write)
     {
-        // write the value
+        // write the value to line[index]
+    } else {
+        // return the value in index
+        index = 0;
     }
     
     if (_debug) printf("\n");
@@ -398,36 +408,76 @@ cycle_t MemoryCache::write(reg_t addr, reg_t val)
 {
     // Check to see if the address is requesting a word that falls over the
     // boundry of a cache line
+    cycle_t ret = 0;
+    char start = addr & kIgnoredBitsMask;
+    
+    if (start)
+    {
+        if (_debug) printf("CACHE: Writing over word boundry.");
+        
+        reg_t top, bottom;
+        reg_t mask = kWordMask;
+        start *= 8; // the amount of bits in the LOWER half of the word
+        mask >>= start;
+        
+        // Mask will select the bytes to be written to the BOTTOM word
+        bottom = val & mask;
+        // NOT mask to get the TOP word
+        top = val & ~mask;
+        // have to shift it back into place of course
+        top <<= kRegBits - start;
+        
+        // write TOP by ignoring bits
+        reg_t lookup = addr >> kIgnoredBits;
+        lookup <<= kIgnoredBits;
+        ret = cache(lookup, top, true);
+        
+        // write BOTTOM by going one word forward
+        ret += cache(lookup + 4, bottom, true);
+        
+        return (ret);
+    }
     
     // If not, go right to cache
     // drop the bottom two bits of the address
-    reg_t lookup = addr >> kIgnoredBits;
-    lookup <<= kIgnoredBits;
     reg_t index = val;
-    cycle_t ret = cache(lookup, index, true);
-    
-    // If so, split up the word and do two writes
-    
-    // set addr to the word value we've assembled
-    
-    return (ret);
+    return (cache(addr, index, true));
 } 
 
 cycle_t MemoryCache::read(reg_t &addr)
 {
     // Check to see if the address is requesting a word that falls over the
     // boundry of a cache line
+    cycle_t ret = 0;
+    char start = addr & kIgnoredBitsMask;
+    
+    if (start)
+    {
+        if (_debug) printf("CACHE: Reading over word boundry.");
+        
+        // read TOP by ignoring bits
+        reg_t top, bottom;
+        reg_t lookup = addr >> kIgnoredBits;
+        lookup <<= kIgnoredBits;
+        ret = cache(lookup, top);
+        
+        // write BOTTOM by going one word forward
+        ret += cache(lookup + 4, bottom);
+        
+        // Mask out the returned values
+        start *= 8; // the amount of bits in the LOWER half of the word
+        
+        addr = bottom >> start;
+        addr |= top << (kRegBits - start);
+        
+        return (ret);
+    }
     
     // If not, go right to cache
     // drop the bottom two bits of the address
-    reg_t lookup = addr >> kIgnoredBits;
-    lookup <<= kIgnoredBits;
     reg_t index = 0;
-    cycle_t ret = cache(lookup, index, false);
-    
-    // If so, the policy is to cache BOTH lines and combine the values to return
-    
-    // set addr to the word value we've assembled
-    
+    ret = cache(addr, index);
+    addr = index;
     return (ret);
 }
+
