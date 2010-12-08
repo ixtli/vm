@@ -248,7 +248,7 @@ cycle_t MemoryCache::cache(reg_t addr, reg_t &index, bool write)
     // see if set has empty lines
     for (int i = 0; i < _ways; i++)
     {
-        if (_tag[set + i] == -1)
+        if (_tag[set + i] == kWordMask)
         {
             // There was an empty line in this set, so assign it
             index = set + i;
@@ -374,7 +374,7 @@ cycle_t MemoryCache::cache(reg_t addr, reg_t &index, bool write)
 reg_t MemoryCache::lru(reg_t set)
 {
     // Assume set points to the BEGINNING of the set
-    if (set + (_ways-1) > _size)
+    if (set + (_ways - 1) > _size)
     {
         fprintf(stderr, "CACHE: lru set index out of bounds.\n");
         return (0);
