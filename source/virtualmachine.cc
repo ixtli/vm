@@ -402,6 +402,8 @@ bool VirtualMachine::configure(const char *c_path, ALUTimings &at)
                         break;
                     }
                     
+                    _cache_desc[i-1].debug = _debug_cache;
+                    
                     lua->closeTable();
                 } else {
                     fprintf(stderr, "Improper cache table format.\n");
@@ -479,7 +481,7 @@ bool VirtualMachine::init(const char *config)
     
     // Init memory
     mmu = new MMU(this, _mem_size, _read_cycles, _write_cycles);
-    if (mmu->init(_caches, _cache_desc, _debug_cache)) return (true);
+    if (mmu->init(_caches, _cache_desc)) return (true);
     
     // Init instruction pipeline
     pipe = new InstructionPipeline(_pipe_stages, this);

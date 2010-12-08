@@ -32,7 +32,7 @@ public:
     MMU(VirtualMachine *vm, reg_t size, cycle_t rtime, cycle_t wtime);
     ~MMU();
     
-    bool init(char caches, CacheDescription *desc, bool debug = false);
+    bool init(char caches, CacheDescription *desc);
     
     reg_t loadProgramImageFile(const char *path, reg_t to, bool writeBreak);
     bool writeOut(const char *path);
@@ -51,6 +51,16 @@ public:
     inline reg_t memorySize()
     {
         return (_memory_size);
+    }
+    
+    inline cycle_t readTime()
+    {
+        return (_read_time);
+    }
+    
+    inline cycle_t writeTime()
+    {
+        return (_write_time);
     }
     
     // Operational: must return the timing

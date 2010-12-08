@@ -3,8 +3,11 @@
 
 #include "global.h"
 
+
 enum CacheConstants
 {
+    kIgnoredBits = 2,
+    kIgnoredBitsMask = 0x3,
     kLineSize = 4
 };
 
@@ -14,6 +17,8 @@ typedef struct CacheDescription
     char ways;
     char len;
     cycle_t time;
+    char level;
+    bool debug;
 };
 
 // Forward class definitions
@@ -25,17 +30,28 @@ public:
     MemoryCache();
     ~MemoryCache();
     
-    bool init(MMU *mmu, CacheDescription &desc, char level, bool debug = false);
+    bool init(MMU *mmu, CacheDescription &desc, MemoryCache *parent);
     
-    bool isCached(reg_t addr, size_t &index);
-    bool cache(reg_t &addr, bool write = false);
+    cycle_t write(reg_t addr, reg_t val);
+    cycle_t read(reg_t &addr);
     
     inline cycle_t accessTime()
     {
         return (_access_time);
     }
     
+    inline bool storesValues()
+    {
+        return (_store);
+    }
+    
 private:
+    reg_t lru(reg_t set);
+    bool isCached(reg_t addr, reg_t &index);
+    cycle_t cache(reg_t addr, reg_t &index, bool write = false);
+    void use(reg_t index);
+    reg_t valueAtOffset(reg_t index, reg_t offset);
+    
     MMU *_mmu;
     bool _debug;
     
@@ -44,7 +60,7 @@ private:
     char _ways, _level, _line_length;
     char _offset_bits, _index_bits, _tag_bits;
     cycle_t _access_time;
-    
+    MemoryCache *_parent;
     reg_t _tag_mask, _index_mask, _offset_mask;
     
     // Cache data
@@ -52,6 +68,8 @@ private:
     bool *_dirty;
     char *_lru;
     
+    // do we actually save data?
+    bool _store;
 };
 
 #endif // Include Guard
