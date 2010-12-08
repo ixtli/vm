@@ -620,7 +620,11 @@ char *VirtualMachine::statusString(size_t &len)
         "r8 - %u r9 - %u r10 - %u r11 - %u\n", _r[8], _r[9], _r[10], _r[11]);
     sprintf(temp+strlen(temp),  
         "r12 - %u r13 - %u r14 - %u r15 - %u\n", _r[12], _r[13], _r[14], _r[15]);
-    
+    sprintf(temp+strlen(temp), "fpr0 - %f fpr1 - %f fpr2 - %f fpr3 - %f\n",
+        (float)_fpr[0], (float)_fpr[1], (float)_fpr[2], (float)_fpr[3]);
+    sprintf(temp+strlen(temp), "fpr4 - %f fpr5 - %f fpr6 - %f fpr7 - %f\n",
+        (float)_fpr[4], (float)_fpr[5], (float)_fpr[6], (float)_fpr[7]);
+
     char *pipeStatus = pipe->stateString();
     sprintf(temp+strlen(temp),"Pipeline State:\n%s", pipeStatus);
     free(pipeStatus);
