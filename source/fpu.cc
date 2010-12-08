@@ -27,7 +27,7 @@ cycle_t FPU::execute(const FPFlags &flags)
     reg_t fpn = _vm->selectRegister(flags.n);
     reg_t fpm = _vm->selectRegister(flags.m);
 
-    //  printf("%u %u %u %u", *_fps, *_fpd, *_fpn, *_fpm);
+   // printf("%u %u", fpn, fpm);
     
     
     //Add FPn + FPm and store result in FPs and FPd.
@@ -43,6 +43,7 @@ cycle_t FPU::execute(const FPFlags &flags)
             _output = (fpn * fpm);
             break;
         case kFDV:
+            printf("========================");
             _output = fpn / fpm;
             break;
         default:

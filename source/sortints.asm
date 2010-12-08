@@ -29,7 +29,6 @@ main:
         stw r0, r1 
         sub r0, r0, 4
         stw r0, r2
-        mov r0, ds
     al  b main
 end:
 add r14, r14, 1
