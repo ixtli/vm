@@ -114,7 +114,7 @@ private:
             squash = 0; bubble = 0; unused = 0;
             lock = 0x0; wait = 0x0;
         }
-
+        
         char squash:1, bubble:1, unused:6;
         reg_t lock, wait;
     };

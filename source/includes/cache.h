@@ -3,6 +3,12 @@
 
 #include "global.h"
 
+enum CacheConstants
+{
+    kCacheMaxTagValue = 0xFFFFFFFF,
+    kLineSize = 4
+};
+
 typedef struct CacheDescription
 {
     reg_t size;
@@ -22,7 +28,7 @@ public:
     bool init(MMU *mmu, CacheDescription &desc, char level);
     
     bool isCached(reg_t addr);
-    void cache(reg_t addr);
+    bool cache(reg_t &addr, bool write = false);
     
     inline cycle_t accessTime()
     {
@@ -34,8 +40,10 @@ private:
     
     // Cache metadata
     reg_t _size;
-    char _ways, _level;
+    char _ways, _level, _length;
     cycle_t _access_time;
+    
+    reg_t _tag_mask, _index_mask, _offset_mask;
     
     // Cache data
     reg_t *_tag;

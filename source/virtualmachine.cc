@@ -989,10 +989,10 @@ void VirtualMachine::decodeInstruction(PipelineData *d)
             d->flags.st.rd = (_ir & kSTDestMask) >> 10;
             d->flags.st.offset = (_ir & kSTOffsetMask);
             
-            // lock base if there is writeback
-            if (d->flags.st.w)
-                pipe->waitOnRegister(d->flags.st.rs);
+            // wait on the source register
+            pipe->waitOnRegister(d->flags.st.rs);
             
+            // Check to see if we're doing fancy shifting, if so wait on source
             if (!d->flags.st.i)
             {
                 pipe->waitOnRegister(
@@ -1131,9 +1131,10 @@ void VirtualMachine::executeInstruction(PipelineData *d)
             pipe->lock(kPQ1Code);
         } else {
             // lock dest register
-            pipe->lock(d->flags.st.rd);
+            pipe->lock(d->flags.dp.rd);
         }
         
+        // Do the job
         incCycleCount(alu->dataProcessing(d->flags.dp));
         
         // Save emitted values
@@ -1151,10 +1152,12 @@ void VirtualMachine::executeInstruction(PipelineData *d)
         if (d->flags.st.l)
             pipe->lock(d->flags.st.rd);
         
-        // lock base if there is writeback
+        // lock source register if there will be writeback
         if (d->flags.st.w)
             pipe->lock(d->flags.st.rs);
         
+        // Here we use the alu to calculate the address we're going to be
+        // transfering to or from.
         incCycleCount(alu->singleTransfer(d->flags.st));
         
         // Save emitted values
@@ -1174,14 +1177,18 @@ void VirtualMachine::executeInstruction(PipelineData *d)
         break;
         
         case kInterrupt:
+        // Interrupts are executed during writeback so as to not invalidate
+        // an instruction that is closer to the front of the pipe
         if (_forwarding) writeBack(d);
         break;
         
         case kFloatingPoint:
         
-        pipe->lock(d->flags.fp.s);
-        pipe->lock(d->flags.fp.d);
+        // TODO: optimize this
+        pipe->lock(d->flags.fp.s + kFPR0Code);
+        pipe->lock(d->flags.fp.d + kFPR0Code);
         
+        // Have the FPU do the operation
         incCycleCount(fpu->execute(d->flags.fp));
         
         // Save emitted values

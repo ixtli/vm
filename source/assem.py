@@ -601,6 +601,8 @@ class Assembler:
                 # print "Branch to '"+branch_loc+"': " + str(offset)
                 
                 bin += self.decToBin(offset, 24);
+            elif (instruction in self.floating_point):
+                print "fp";
             else:
                 print "Invalid operation '" + instruction + "'.";
                 bin = self.condition_codes["nv"] + self.decToBin(0, 28)

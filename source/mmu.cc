@@ -150,6 +150,22 @@ bool MMU::writeOut(const char *path)
     return (false);
 }
 
+cycle_t MMU::cache(reg_t addr, bool write, bool word)
+{
+    cycle_t ret = 0;
+    
+    // is it in any of the caches?
+    
+    // if it is, get the total cost of reading from the caches we've read to
+    // so far.  also dirty the line if we're writing
+    
+    // if not, load it in to all of the caches
+    
+    // if any evictions occurred keep track of the time taken to write back
+    
+    return (ret);
+}
+
 cycle_t MMU::writeByte(reg_t addr, char valueToSave)
 {
     if (addr >= _memory_size)
@@ -157,7 +173,8 @@ cycle_t MMU::writeByte(reg_t addr, char valueToSave)
     
     _memory[addr] = valueToSave;
     
-    return (_write_time);
+    // The amount of time this takes is simulated by our caches
+    return (cache(addr, true, false));
 }
 
 cycle_t MMU::writeWord(reg_t addr, reg_t valueToSave)
@@ -168,7 +185,8 @@ cycle_t MMU::writeWord(reg_t addr, reg_t valueToSave)
     reg_t *temp = (reg_t *) &(_memory[addr]);
     *temp = valueToSave;
     
-    return (_write_time);
+    // The amount of time this takes is simulated by our caches
+    return (cache(addr, true));
 }
 
 cycle_t MMU::writeBlock(reg_t addr, reg_t *data, reg_t size)
@@ -184,7 +202,13 @@ cycle_t MMU::writeBlock(reg_t addr, reg_t *data, reg_t size)
     for (int i = 0; i < (size >> 2); i++)
         temp[i] = data[i];
     
-    return (_write_time);
+    // Simulate a cache
+    cycle_t ret = 0;
+    for (int i = 0; i < size; i++)
+        ret += cache(addr + i, true, false);
+    
+    // The amount of time this takes is simulated by our caches
+    return (ret);
 }
 
 cycle_t MMU::readWord(reg_t addr, reg_t &valueToRet)
@@ -195,7 +219,8 @@ cycle_t MMU::readWord(reg_t addr, reg_t &valueToRet)
     reg_t *temp = (reg_t *) &(_memory[addr]);
     valueToRet = *temp;
     
-    return (_read_time);
+    // The amount of time this takes is simulated by our caches
+    return (cache(addr));
 }
 
 cycle_t MMU::readByte(reg_t addr, char &valueToRet)
@@ -204,8 +229,9 @@ cycle_t MMU::readByte(reg_t addr, char &valueToRet)
         return 0;
     
     valueToRet = _memory[addr];
-
-    return (_read_time);
+    
+    // The amount of time this takes is simulated by our caches
+    return (cache(addr, false, false));
 }
 
 cycle_t MMU::readRange(reg_t start, reg_t end, bool hex, char **ret)
@@ -230,6 +256,10 @@ cycle_t MMU::readRange(reg_t start, reg_t end, bool hex, char **ret)
         strcpy(&(*ret)[last], temp);
         last += strlen(temp);
     }
+    
+    // This function isn't used by anything but status query functions
+    // so don't mess the caches up with it.
+    return (0);
 }
 
 void MMU::abort(const reg_t &location)
