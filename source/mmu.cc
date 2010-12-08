@@ -26,7 +26,7 @@ MMU::~MMU()
     printf("Done.\n");
 }
 
-bool MMU::init(char caches, CacheDescription *desc)
+bool MMU::init(char caches, CacheDescription *desc, bool debug)
 {
     // Make sure we have a vm
     if (!_vm) return (true);
@@ -63,7 +63,7 @@ bool MMU::init(char caches, CacheDescription *desc)
     
     for (int i = 0; i < _caches; i++ )
     {
-        if (_cache[i].init(this, desc[i], i))
+        if (_cache[i].init(this, desc[i], i, debug))
             return (true);
     }
     

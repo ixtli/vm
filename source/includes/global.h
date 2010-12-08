@@ -18,6 +18,9 @@ typedef unsigned int reg_t;
 typedef size_t cycle_t;
 
 // Calculate the machines word length (PROTIP: Keep this 32 bits)
-#define kRegSize   sizeof(reg_t)
+#define kRegSize    sizeof(reg_t)
+
+// Calculate the amount of bits in a word
+#define kRegBits    (kRegSize << 3)
 
 #endif

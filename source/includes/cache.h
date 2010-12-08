@@ -5,7 +5,6 @@
 
 enum CacheConstants
 {
-    kCacheMaxTagValue = 0xFFFFFFFF,
     kLineSize = 4
 };
 
@@ -13,6 +12,7 @@ typedef struct CacheDescription
 {
     reg_t size;
     char ways;
+    char len;
     cycle_t time;
 };
 
@@ -25,9 +25,9 @@ public:
     MemoryCache();
     ~MemoryCache();
     
-    bool init(MMU *mmu, CacheDescription &desc, char level);
+    bool init(MMU *mmu, CacheDescription &desc, char level, bool debug = false);
     
-    bool isCached(reg_t addr);
+    bool isCached(reg_t addr, size_t &index);
     bool cache(reg_t &addr, bool write = false);
     
     inline cycle_t accessTime()
@@ -37,10 +37,12 @@ public:
     
 private:
     MMU *_mmu;
+    bool _debug;
     
     // Cache metadata
     reg_t _size;
-    char _ways, _level, _length;
+    char _ways, _level, _line_length;
+    char _offset_bits, _index_bits, _tag_bits;
     cycle_t _access_time;
     
     reg_t _tag_mask, _index_mask, _offset_mask;

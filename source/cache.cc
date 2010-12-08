@@ -1,4 +1,5 @@
 #include "includes/util.h"
+#include "includes/virtualmachine.h"
 #include "includes/mmu.h"
 #include "includes/cache.h"
 
@@ -16,18 +17,18 @@ MemoryCache::~MemoryCache()
     if (_lru) free(_lru);
 }
 
-bool MemoryCache::init(MMU *mmu, CacheDescription &desc, char level)
+bool MemoryCache::init(MMU *mmu, CacheDescription &desc, char level, bool debug)
 {
     if (!mmu) return (true);
     
-    // Line is this many WORDS long
-    _length = kLineSize;
+    _debug = debug;
     
     // Initialize members
     _mmu = mmu;
     _level = level;
     _size = desc.size;
     _ways = desc.ways;
+    _line_length = desc.len;
     _access_time = desc.time;
     
     // Cache should not be more than half the size of memory
@@ -48,6 +49,17 @@ bool MemoryCache::init(MMU *mmu, CacheDescription &desc, char level)
         desc.size = _size;
     }
     
+    // Line length must be powers of two
+    _line_length = _nearest_power_of_two(_line_length);
+    if ( _line_length != desc.len)
+    {
+        fprintf(stderr,
+            "Warning: level-%i line length changed to nearest power of two.\n",
+            level);
+        
+        desc.len = _line_length;
+    }
+    
     // ways must divide in to the size evenly
     if ( _size % _ways )
     {
@@ -60,7 +72,8 @@ bool MemoryCache::init(MMU *mmu, CacheDescription &desc, char level)
     }
     
     // Initialize cache
-    printf("%ub %u-way level-%u cache... ", _size, _ways, _level);
+    printf("%u word long %u line, %u-way level-%u cache... ",
+            _line_length, _size, _ways, _level);
     
     _tag = (reg_t *)malloc(_size * sizeof(reg_t));
     _dirty = (bool *)calloc(_size, sizeof(bool));
@@ -74,34 +87,59 @@ bool MemoryCache::init(MMU *mmu, CacheDescription &desc, char level)
     
     // initialize tag to -1 for "empty" because it can't get that big
     for (reg_t i = 0; i < _size; i++)
-        _tag[i] = kCacheMaxTagValue;
+        _tag[i] = kWordMask;
     
-    // create the mask for the tag part of an address
-    reg_t temp = (_size / _ways);
-    char bits = 0;
+    // compute how many bits the offset will take up
+    reg_t temp = _line_length << 2;  // How many bytes total? (words * 4)
+    _offset_bits = 0;
     while (temp)
     {
-        bits++;
+        _offset_bits++;
         temp >>= 1;
     }
     
-    // The _tag_mask now selects the bits of an address with 
-    _tag_mask = kCacheMaxTagValue << bits;
-    _index_mask = ~_tag_mask;
+    // compute how many bits the index will take
+    temp = (_size / _ways);
+    _index_bits = 0;
+    while (temp)
+    {
+        _index_bits++;
+        temp >>= 1;
+    }
     
-    // TODO: Calculate this when implementing variable line length
-    _offset_mask = 0xF;
+    // compute the bit length of the tag
+    _tag_bits = kRegBits - _index_bits - _offset_bits;
+    
+    if (_debug)
+    {
+        printf("\n   %u bit tag, %u bit index, %u bit offset \n",
+                _tag_bits, _index_bits, _offset_bits);
+    }
+    
+    // The _tag_mask now selects an address' tag
+    _tag_mask = kWordMask << _index_bits + _offset_bits;
+    // _index_mask now selects the index's index
+    _index_mask = (~_tag_mask) << _offset_bits;
+    // _offset_mask now selects the least significant offsetBits of an address
+    _offset_mask = ~(kWordMask << _offset_bits);
     
     printf("Done.\n");
     return (false);
 }
 
-bool MemoryCache::isCached(reg_t addr)
+bool MemoryCache::isCached(reg_t addr, size_t &index)
 {
-    reg_t index = addr & _index_mask;
     reg_t tag = addr & _tag_mask;
     
-    // locate
+    // Is the tag in our cache?
+    for (size_t i = 0; i < _size; i++)
+    {
+        if (tag == _tag[i])
+        {
+            index = i;
+            return (true);
+        }
+    }
     
     return (false);
 }

@@ -229,6 +229,9 @@ private:
     
     // state info
     cycle_t _cycle_count, _swint_cycles, _branch_cycles;
+    
+    // virtual machine configuration variables
+    bool _debug_cache;
 };
 
 // SIGINT flips this to tell everything to turn off

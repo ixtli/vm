@@ -317,6 +317,7 @@ bool VirtualMachine::configure(const char *c_path, ALUTimings &at)
     lua->getGlobalField("program_length_trap", kLUInt, &_length_trap);
     lua->getGlobalField("machine_cycle_trap", kLUInt, &_cycle_trap);
     lua->getGlobalField("stages", kLUInt, &_pipe_stages);
+    lua->getGlobalField("debug_cache", kLBool, &_debug_cache);
     
     // Error check pipe stages
     if (_pipe_stages != 1 && _pipe_stages != 4 && _pipe_stages != 5)
@@ -375,7 +376,7 @@ bool VirtualMachine::configure(const char *c_path, ALUTimings &at)
             {
                 if (lua->openTableAtTableIndex(i) != kLuaUnexpectedType)
                 {
-                    if (lua->lengthOfCurrentObject() != 3)
+                    if (lua->lengthOfCurrentObject() != 4)
                     {
                         fprintf(stderr, "Invalid cache description %i.\n", i);
                         free(_cache_desc);
@@ -388,7 +389,8 @@ bool VirtualMachine::configure(const char *c_path, ALUTimings &at)
                     int err;
                     err = lua->getTableField(1,kLUInt, &_cache_desc[i-1].size);
                     err += lua->getTableField(2,kLUInt, &_cache_desc[i-1].ways);
-                    err += lua->getTableField(3,kLUInt, &_cache_desc[i-1].time);
+                    err += lua->getTableField(3,kLUInt, &_cache_desc[i-1].len);
+                    err += lua->getTableField(4,kLUInt, &_cache_desc[i-1].time);
                     
                     if (err != kLuaNoError)
                     {
@@ -432,6 +434,7 @@ void VirtualMachine::setMachineDefaults()
     _fpsr = 0;
     _length_trap = 0;
     _cycle_trap = 0;
+    _debug_cache = false;
     
     // Others have "hardcoded" defaults
     _breakpoint_count = kDefaultBreakCount;
@@ -476,7 +479,7 @@ bool VirtualMachine::init(const char *config)
     
     // Init memory
     mmu = new MMU(this, _mem_size, _read_cycles, _write_cycles);
-    if (mmu->init(_caches, _cache_desc)) return (true);
+    if (mmu->init(_caches, _cache_desc, _debug_cache)) return (true);
     
     // Init instruction pipeline
     pipe = new InstructionPipeline(_pipe_stages, this);
