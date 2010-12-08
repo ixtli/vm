@@ -127,13 +127,13 @@ bool MemoryCache::init(MMU *mmu, CacheDescription &desc, MemoryCache *parent)
     // The _tag_mask now selects an address' tag
     _tag_mask = kWordMask << _index_bits + _offset_bits + kIgnoredBits;
     
-    // remember to add kIgnoredBytes (2) to the amount of offset bits 
-    _offset_mask = ~(kWordMask << (_offset_bits + kIgnoredBits));
+    // Make the mask for the offset
+    _offset_mask = ~(kWordMask << _offset_bits);
     // For the reasons explained above, do not select the lowest 2 bits 
-    _offset_mask |= kIgnoredBitsMask;
+    _offset_mask <<= kIgnoredBits;
     
     // _index_mask selects everything that hasn't already been selected
-    _index_mask = (~_tag_mask) | (~_offset_mask) | (~kIgnoredBitsMask);
+    _index_mask = ~(_tag_mask | _offset_mask | kIgnoredBitsMask);
     
     if (_debug)
         printf("CACHE: Masks: tag: %#010x index: %#010x offset: %#010x\n",
