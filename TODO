@@ -1,9 +1,5 @@
 TODO
 
-Write a cache!
-
-Restrict memory size to a power of two!
-
 Test all instructions
 
 Server does NOT convert anything to Network Byte Order
@@ -14,10 +10,6 @@ Image format for executable
 
 Interrupt table loading from file (format)
     lua scriptable
-
-Queue data structure used to represent pipeline
-	Efficiency = Optimal / Actual
-	Show pipe status in output BETTER
 
 Update client functionality
 
