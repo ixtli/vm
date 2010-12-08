@@ -14,7 +14,7 @@ stack_size = 8
 break_count = 10
 
 -- Pipeline configuration
-stages = 5
+stages = 4
 
 -- Cache configuration
 -- Each element in the list is {lines, ways, line length, access time}

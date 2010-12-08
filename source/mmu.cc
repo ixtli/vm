@@ -67,7 +67,7 @@ bool MMU::init(char caches, CacheDescription *desc)
         
         if (i == _caches - 1)
         {
-            if (_cache[0].init(this, desc[i], NULL))
+            if (_cache[i].init(this, desc[i], NULL))
                 return (true);
         } else {
             if (_cache[i].init(this, desc[i], &_cache[i+1]))
@@ -160,6 +160,12 @@ bool MMU::writeOut(const char *path)
 
 cycle_t MMU::cache(reg_t addr, bool write, bool word)
 {
+    if (!_caches)
+    {
+        if (write) return (_write_time);
+        return (_read_time);
+    }
+    
     cycle_t ret = 0;
     reg_t resolved_address = addr;
     

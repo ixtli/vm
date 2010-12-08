@@ -1244,5 +1244,8 @@ void VirtualMachine::memoryAccess(PipelineData *d)
 // Single stage pipe
 void VirtualMachine::doInstruction(PipelineData *d)
 {
-    
+    fetchInstruction(d);
+    decodeInstruction(d);
+    executeInstruction(d);
+    memoryAccess(d);
 }

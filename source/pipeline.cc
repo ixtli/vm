@@ -177,8 +177,23 @@ bool InstructionPipeline::registerStage(pipeFunc func)
 // Pipe manipulation
 bool InstructionPipeline::cycle()
 {
+    if (!_stages_in_use)
+    {
+        fprintf(stderr, "No stages registered!\n");
+        return (true);
+    }
+    
     // Reset state of pipe stage zero
     _flags[0].clear();
+    
+    // Special case
+    if (_stages_in_use == 1)
+    {
+        (_vm->*_inst[0])(_data[0]);
+        _vm->incCycleCount(1);
+        _current_stage = 0;
+        return (false);
+    }
     
     // Loop through the stages from end to front
     for (int i = _stages_in_use - 1; i > -1; i--)
