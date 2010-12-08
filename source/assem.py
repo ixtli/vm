@@ -47,11 +47,13 @@ class Assembler:
                     "r12" : "01100", "r13"  : "01101", "r14"  : "01110",
                     "r15" : "01111", "pq0"  : "10000", "pq1"  : "10001", 
                     "pc"  : "10010", "psr"  : "10011", "cs"   : "10100", 
-                    "ds"  : "10101", "ss"   : "10110", "fpsr" : "10111", 
-                    "fpr0": "11000", "fpr1" : "11001", "fpr2" : "11010", 
-                    "fpr3": "11011", "fpr4" : "11100", "fpr5" : "11101", 
-                    "fpr6": "11110", "fpr7" : "11111"}
-    
+                    "ds"  : "10101", "ss"   : "10110", "fpsr" : "10111"}
+ 
+                   
+    fp_registers = {"fpr0": "000", "fpr1" : "001", "fpr2" : "010", 
+                    "fpr3": "011", "fpr4" : "100", "fpr5" : "101", 
+                    "fpr6": "110", "fpr7" : "111"}
+   
     condition_codes = { "eq" : "0000", "ne" : "0001", "cs" : "0010",
                         "cc" : "0011", "mi" : "0100", "pl" : "0101", 
                         "vs" : "0110", "vc" : "0111", "hi" : "1000", 
@@ -602,7 +604,16 @@ class Assembler:
                 
                 bin += self.decToBin(offset, 24);
             elif (instruction in self.floating_point):
-                print "fp";
+                if(len(line) < 4):
+                        print "Not enough arguments for FP operation, need 4";
+                else:
+                    bin += "1110";
+                    bin += self.floating_point[instruction];
+                    bin += self.fp_registers[line[0]];
+                    bin += self.fp_registers[line[1]];
+                    bin += self.fp_registers[line[2]];
+                    bin += self.fp_registers[line[3]];
+                    bin += "00000000"
             else:
                 print "Invalid operation '" + instruction + "'.";
                 bin = self.condition_codes["nv"] + self.decToBin(0, 28)
