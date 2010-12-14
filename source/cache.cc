@@ -311,9 +311,8 @@ cycle_t MemoryCache::cache(reg_t addr, reg_t &index, bool write)
     
     if (_debug)
     {
-        reg_t comp_set = set ? set / _ways : 0;
         printf("evicting set %u way %u ",
-                comp_set, index - set);
+                set ? set / _ways : 0, index ? index - set : 0);
     }
     
     // if index is dirty, write the value to parent
@@ -384,7 +383,7 @@ cycle_t MemoryCache::cache(reg_t addr, reg_t &index, bool write)
 reg_t MemoryCache::lru(reg_t set)
 {
     // Assume set points to the BEGINNING of the set
-    if (set + (_ways - 1) > _size)
+    if (set + (_ways - 1) >= _size)
     {
         fprintf(stderr, "CACHE: lru set index out of bounds.\n");
         return (0);

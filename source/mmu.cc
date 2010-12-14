@@ -73,6 +73,13 @@ bool MMU::init(char caches, CacheDescription *desc)
             if (_cache[i].init(this, desc[i], &_cache[i+1]))
                 return (true);
         }
+        
+        // error check
+        if (desc[i].ways == desc[i].size)
+        {
+            fprintf(stderr, "Ways cannot equal size.\n");
+            return (true);
+        }
     }
     
     // Initialize cache accounting
